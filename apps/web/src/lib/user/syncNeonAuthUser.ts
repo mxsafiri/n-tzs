@@ -12,6 +12,7 @@ export async function syncNeonAuthUser() {
   }
 
   const userEmailNormalized = user.email?.trim().toLowerCase() ?? null
+  const userEmailToStore = userEmailNormalized ?? `${user.id}@unknown.local`
   const bootstrapEmailList = (process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL ?? '')
     .split(',')
     .map((e) => e.trim().toLowerCase())
@@ -43,9 +44,9 @@ export async function syncNeonAuthUser() {
 
   // Fallback: if the user already exists by email, attach neon auth id.
   // (This handles edge cases where you imported users before enabling Neon Auth.)
-  if (user.email) {
+  if (userEmailNormalized) {
     const byEmail = await db.query.users.findFirst({
-      where: eq(users.email, user.email),
+      where: eq(users.email, userEmailNormalized),
     })
 
     if (byEmail) {
@@ -72,10 +73,60 @@ export async function syncNeonAuthUser() {
     .insert(users)
     .values({
       neonAuthUserId: user.id,
-      email: user.email ?? `${user.id}@unknown.local`,
+      email: userEmailToStore,
       role: shouldBootstrapSuperAdmin ? 'super_admin' : undefined,
     })
+    .onConflictDoNothing()
     .returning()
 
-  return inserted[0] ?? null
+  if (inserted[0]) {
+    return inserted[0]
+  }
+
+  // If we got here, another request likely inserted the user in parallel.
+  // Re-fetch and ensure the Neon Auth user id is attached.
+  const existingAfter = await db.query.users.findFirst({
+    where: eq(users.neonAuthUserId, user.id),
+  })
+
+  if (existingAfter) {
+    if (shouldBootstrapSuperAdmin && existingAfter.role !== 'super_admin') {
+      const updated = await db
+        .update(users)
+        .set({ role: 'super_admin', updatedAt: new Date() })
+        .where(eq(users.id, existingAfter.id))
+        .returning()
+
+      return updated[0] ?? existingAfter
+    }
+
+    return existingAfter
+  }
+
+  if (userEmailNormalized) {
+    const byEmailAfter = await db.query.users.findFirst({
+      where: eq(users.email, userEmailNormalized),
+    })
+
+    if (byEmailAfter) {
+      const setData: Partial<typeof users.$inferInsert> = {
+        neonAuthUserId: user.id,
+        updatedAt: new Date(),
+      }
+
+      if (shouldBootstrapSuperAdmin && byEmailAfter.role !== 'super_admin') {
+        setData.role = 'super_admin'
+      }
+
+      const updated = await db
+        .update(users)
+        .set(setData)
+        .where(eq(users.id, byEmailAfter.id))
+        .returning()
+
+      return updated[0] ?? byEmailAfter
+    }
+  }
+
+  return null
 }

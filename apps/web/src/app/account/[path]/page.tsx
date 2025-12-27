@@ -9,9 +9,21 @@ export default async function AccountPage({
 }) {
   const { path } = await params
 
+  const title = (() => {
+    if (path === 'settings') return 'Account settings'
+    if (path === 'security') return 'Security'
+    if (path === 'sessions') return 'Sessions'
+    return 'Account'
+  })()
+
   return (
-    <main className="container mx-auto flex grow flex-col items-center justify-center gap-3 self-center p-4 md:p-6">
+    <div className="flex flex-col gap-6">
+      <div>
+        <div className="text-xs font-medium text-white/60">Account</div>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h1>
+      </div>
+
       <AccountView path={path} />
-    </main>
+    </div>
   )
 }

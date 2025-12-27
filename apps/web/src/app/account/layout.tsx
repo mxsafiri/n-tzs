@@ -5,10 +5,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { UserButton } from '@neondatabase/neon-js/auth/react/ui'
 
-import type { UserRole } from '@/lib/auth/rbac'
 import { syncNeonAuthUser } from '@/lib/user/syncNeonAuthUser'
 
-export default async function AppLayout({
+export default async function AccountLayout({
   children,
 }: {
   children: ReactNode
@@ -17,31 +16,6 @@ export default async function AppLayout({
   if (!dbUser) {
     redirect('/auth/sign-in')
   }
-
-  const role = dbUser.role as UserRole
-
-  const navItems: { href: string; label: string }[] = (() => {
-    if (role === 'end_user') {
-      return [{ href: '/app/user', label: 'Dashboard' }]
-    }
-
-    if (role === 'bank_admin') {
-      return [{ href: '/app/bank', label: 'Bank' }]
-    }
-
-    if (role === 'platform_compliance') {
-      return [
-        { href: '/app/compliance', label: 'Compliance' },
-        { href: '/app/oversight', label: 'Oversight' },
-      ]
-    }
-
-    return [
-      { href: '/app/admin', label: 'Admin' },
-      { href: '/app/oversight', label: 'Oversight' },
-      { href: '/backstage', label: 'Backstage' },
-    ]
-  })()
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -52,7 +26,7 @@ export default async function AppLayout({
 
       <header className="relative z-10 border-b border-white/10 bg-black/30 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Link href="/app" className="flex items-center gap-3">
               <div className="overflow-hidden rounded-full">
                 <Image src="/ntzs-logo.png" alt="nTZS" width={28} height={28} />
@@ -60,34 +34,26 @@ export default async function AppLayout({
               <div className="text-sm font-semibold tracking-wide">nTZS</div>
             </Link>
 
-            <div className="hidden items-center gap-2 md:flex">
-              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
-                {role.replace('_', ' ')}
-              </div>
+            <div className="hidden rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 md:inline-flex">
+              Account &amp; Settings
             </div>
           </div>
 
-          <nav className="hidden items-center gap-6 text-sm text-white/70 md:flex">
-            {navItems.map((item) => (
-              <Link key={item.href} href={item.href} className="hover:text-white">
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
           <div className="flex items-center gap-3">
             <Link
-              href="/account/settings"
+              href="/app"
               className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 backdrop-blur-lg hover:bg-white/10 md:inline-flex"
             >
-              Account
+              Back to dashboard
             </Link>
             <UserButton size="icon" />
           </div>
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 py-8">{children}</div>
+      <main className="relative z-10 mx-auto w-full max-w-2xl px-6 py-10 lg:max-w-4xl">
+        {children}
+      </main>
     </div>
   )
 }

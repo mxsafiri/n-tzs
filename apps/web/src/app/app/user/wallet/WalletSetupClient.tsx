@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   useAuthenticateWithJWT,
@@ -12,7 +12,7 @@ import {
 
 import { saveEmbeddedWalletAction } from './actions'
 
-type UiStatus = 'idle' | 'authenticating' | 'creating_wallet'
+type UiStatus = 'idle' | 'creating'
 
 export function WalletSetupClient() {
   const { isInitialized } = useIsInitialized()
@@ -23,54 +23,65 @@ export function WalletSetupClient() {
 
   const [status, setStatus] = useState<UiStatus>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState<string>('')
 
-  const canAuthenticate = isInitialized && !currentUser
-  const canCreateWallet = isInitialized && Boolean(currentUser) && !evmAddress
+  const canCreate = isInitialized && !evmAddress
 
   const addressToSave = useMemo(() => {
     if (!evmAddress) return ''
     return String(evmAddress)
   }, [evmAddress])
 
-  async function handleAuthenticate() {
-    setError(null)
-    setStatus('authenticating')
-
-    try {
-      await authenticateWithJWT()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to authenticate')
-    } finally {
-      setStatus('idle')
-    }
-  }
-
+  // Single unified flow: authenticate + create wallet
   async function handleCreateWallet() {
     setError(null)
-    setStatus('creating_wallet')
+    setStatus('creating')
 
     try {
+      // Step 1: Authenticate with JWT if not already authenticated
+      if (!currentUser) {
+        setStatusMessage('Authenticating...')
+        await authenticateWithJWT()
+      }
+
+      // Step 2: Create the embedded wallet
+      setStatusMessage('Creating your secure wallet...')
       await createEvmEoaAccount()
+
+      setStatusMessage('Wallet created successfully!')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create wallet')
+      const message = err instanceof Error ? err.message : 'Failed to create wallet'
+      setError(message)
+      setStatusMessage('')
     } finally {
       setStatus('idle')
     }
   }
+
+  // Clear status message after wallet is created
+  useEffect(() => {
+    if (evmAddress && statusMessage === 'Wallet created successfully!') {
+      const timer = setTimeout(() => setStatusMessage(''), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [evmAddress, statusMessage])
 
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
         <div className="text-sm font-semibold">Status</div>
         <div className="mt-2 text-sm text-white/70">
-          {isInitialized ? 'Wallet services are ready.' : 'Preparing wallet services…'}
+          {!isInitialized && 'Preparing wallet services…'}
+          {isInitialized && !evmAddress && 'Ready to create your wallet.'}
+          {isInitialized && evmAddress && 'Your wallet is set up.'}
         </div>
-        {error ? <div className="mt-2 text-sm text-red-200">{error}</div> : null}
+        {statusMessage && <div className="mt-2 text-sm text-blue-300">{statusMessage}</div>}
+        {error && <div className="mt-2 text-sm text-red-300">{error}</div>}
       </div>
 
       {evmAddress ? (
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="text-sm font-semibold">Wallet address</div>
+          <div className="text-sm font-semibold">Your wallet address</div>
           <div className="mt-2 break-all font-mono text-xs text-white/70">{String(evmAddress)}</div>
 
           <form action={saveEmbeddedWalletAction} className="mt-4 flex flex-col gap-3">
@@ -79,7 +90,7 @@ export function WalletSetupClient() {
               type="submit"
               className="inline-flex h-11 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
             >
-              Save wallet
+              Save wallet to account
             </button>
           </form>
         </div>
@@ -87,25 +98,17 @@ export function WalletSetupClient() {
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="text-sm font-semibold">Set up your wallet</div>
           <div className="mt-2 text-sm text-white/70">
-            Create a secure embedded wallet that can receive settlements.
+            Create a secure embedded wallet to hold your nTZS and receive settlements.
           </div>
 
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={handleAuthenticate}
-              disabled={!canAuthenticate || status !== 'idle'}
-              className="inline-flex h-11 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60"
-            >
-              Connect
-            </button>
+          <div className="mt-4">
             <button
               type="button"
               onClick={handleCreateWallet}
-              disabled={!canCreateWallet || status !== 'idle'}
-              className="inline-flex h-11 items-center justify-center rounded-full border border-white/15 bg-white/5 px-6 text-sm text-white/80 backdrop-blur-lg transition-colors hover:bg-white/10 disabled:opacity-60"
+              disabled={!canCreate || status !== 'idle'}
+              className="inline-flex h-11 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60"
             >
-              Create wallet
+              {status === 'creating' ? 'Creating...' : 'Create wallet'}
             </button>
           </div>
         </div>

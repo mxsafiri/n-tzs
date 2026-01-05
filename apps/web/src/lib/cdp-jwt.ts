@@ -7,24 +7,26 @@ const CDP_JWT_PUBLIC_KEY_JWK = process.env.CDP_JWT_PUBLIC_KEY_JWK
 const CDP_JWT_KID = process.env.CDP_JWT_KID || 'cdp-key-1'
 
 // Fallback development keys (generate your own for production!)
-// These are pre-generated ES256 keys for initial setup
+// Freshly generated ES256 keys
 const DEV_PRIVATE_KEY: JWK = {
   kty: 'EC',
+  x: 'nHaZFcHbwbIg8r3n4KA_MQVE_mfDRpVI6FgB-No8C4I',
+  y: 'iE9c9ce7XtdnLMurcB2u1wehrXNA5IW51g8x_3HmQ8A',
   crv: 'P-256',
-  x: 'f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU',
-  y: 'x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0',
-  d: 'jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI',
+  d: 'B8yO4x8l-znRo_caSO0FKPsDKe8CWClSzBOziKl3qjA',
   alg: 'ES256',
   use: 'sig',
+  kid: 'cdp-key-1',
 }
 
 const DEV_PUBLIC_KEY: JWK = {
   kty: 'EC',
+  x: 'nHaZFcHbwbIg8r3n4KA_MQVE_mfDRpVI6FgB-No8C4I',
+  y: 'iE9c9ce7XtdnLMurcB2u1wehrXNA5IW51g8x_3HmQ8A',
   crv: 'P-256',
-  x: 'f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU',
-  y: 'x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0',
   alg: 'ES256',
   use: 'sig',
+  kid: 'cdp-key-1',
 }
 
 let cachedPrivateKey: CryptoKey | null = null

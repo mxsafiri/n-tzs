@@ -2,13 +2,16 @@ import { NextResponse } from 'next/server'
 import { signCDPToken } from '@/lib/cdp-jwt'
 import { neonAuth } from '@neondatabase/auth/next/server'
 
-// Get the app's base URL for issuer/audience
+// Get the app's PRODUCTION base URL for issuer/audience
+// Must match what's configured in CDP Portal
 function getBaseUrl() {
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
+  // Use explicit production URL to match CDP config
   if (process.env.NEXT_PUBLIC_APP_URL) {
     return process.env.NEXT_PUBLIC_APP_URL
+  }
+  // Hardcode production URL - VERCEL_URL returns deployment-specific URLs
+  if (process.env.VERCEL) {
+    return 'https://ntzs.vercel.app'
   }
   return 'http://localhost:3000'
 }

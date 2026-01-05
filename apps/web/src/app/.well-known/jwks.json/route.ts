@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPublicJWKS } from '@/lib/cdp-jwt'
+import { getPublicJWKS } from '../../../lib/cdp-jwt'
 
 // Standard .well-known JWKS endpoint
 export const dynamic = 'force-dynamic'

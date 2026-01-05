@@ -17,56 +17,44 @@ export async function GET() {
   try {
     const cookieStore = await cookies()
     
-    // Get Neon Auth session from cookies
-    // The session cookie name may vary - check for common patterns
-    const sessionCookie = 
-      cookieStore.get('better-auth.session_token') ||
-      cookieStore.get('__session') ||
-      cookieStore.get('session')
+    // Get all cookies to find the session
+    const allCookies = cookieStore.getAll()
+    console.log('[CDP-Token] Available cookies:', allCookies.map(c => c.name))
     
-    if (!sessionCookie) {
+    // Forward all cookies to the session endpoint
+    const cookieHeader = allCookies.map(c => `${c.name}=${c.value}`).join('; ')
+    
+    if (allCookies.length === 0) {
       return NextResponse.json(
-        { error: 'No session found. Please log in first.' },
+        { error: 'No cookies found. Please log in first.' },
         { status: 401 }
       )
     }
 
-    // Fetch user info from Neon Auth session endpoint
-    const neonAuthUrl = process.env.NEON_AUTH_URL || process.env.NEON_AUTH_BASE_URL
-    if (!neonAuthUrl) {
-      return NextResponse.json(
-        { error: 'NEON_AUTH_URL not configured' },
-        { status: 500 }
-      )
-    }
-
-    // Get session info from Neon Auth
-    const sessionResponse = await fetch(`${neonAuthUrl}/api/auth/get-session`, {
+    // Use our own API to get session (it uses the same cookies)
+    const baseUrl = getBaseUrl()
+    const sessionResponse = await fetch(`${baseUrl}/api/auth/get-session`, {
       headers: {
-        Cookie: `better-auth.session_token=${sessionCookie.value}`,
+        Cookie: cookieHeader,
       },
     })
 
     if (!sessionResponse.ok) {
-      // Try alternative session endpoint
-      const altSessionResponse = await fetch(`${neonAuthUrl}/get-session`, {
-        headers: {
-          Cookie: `better-auth.session_token=${sessionCookie.value}`,
-        },
-      })
+      console.log('[CDP-Token] Session response not ok:', sessionResponse.status)
+      // Try parsing error
+      try {
+        const errData = await sessionResponse.json()
+        console.log('[CDP-Token] Session error:', errData)
+      } catch {}
       
-      if (!altSessionResponse.ok) {
-        return NextResponse.json(
-          { error: 'Failed to validate session with Neon Auth' },
-          { status: 401 }
-        )
-      }
-      
-      const session = await altSessionResponse.json()
-      return await issueToken(session)
+      return NextResponse.json(
+        { error: 'No valid session found. Please log in first.' },
+        { status: 401 }
+      )
     }
 
     const session = await sessionResponse.json()
+    console.log('[CDP-Token] Session data:', JSON.stringify(session).slice(0, 200))
     return await issueToken(session)
   } catch (error) {
     console.error('[CDP-Token] Error:', error)

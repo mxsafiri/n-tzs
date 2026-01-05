@@ -9,33 +9,34 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@ntzs/db": "*",
-    "@neondatabase/neon-js": "^0.1.0-beta.19",
     "@coinbase/cdp-core": "^0.0.74",
     "@coinbase/cdp-hooks": "^0.0.74",
     "@coinbase/cdp-react": "^0.0.74",
+    "@neondatabase/neon-js": "^0.1.0-beta.19",
+    "@ntzs/db": "*",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.44.4",
     "ethers": "^6.14.0",
+    "jose": "^6.1.2",
     "next": "16.1.1",
     "react": "19.1.2",
     "react-dom": "19.1.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "lightningcss": "^1.28.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "lightningcss": "^1.28.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
   "optionalDependencies": {
-    "lightningcss-linux-x64-gnu": "^1.28.0",
-    "lightningcss-linux-x64-musl": "^1.28.0",
     "@tailwindcss/oxide-linux-x64-gnu": "^4.0.0",
-    "@tailwindcss/oxide-linux-x64-musl": "^4.0.0"
+    "@tailwindcss/oxide-linux-x64-musl": "^4.0.0",
+    "lightningcss-linux-x64-gnu": "^1.28.0",
+    "lightningcss-linux-x64-musl": "^1.28.0"
   }
 }

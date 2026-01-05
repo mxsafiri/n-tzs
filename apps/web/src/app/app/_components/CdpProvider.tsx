@@ -4,8 +4,6 @@ import type { ReactNode } from 'react'
 import { useMemo, useCallback } from 'react'
 import { CDPHooksProvider, type Config } from '@coinbase/cdp-hooks'
 
-import { authClient } from '@/lib/auth/client'
-
 export function CdpProvider({
   children,
   enabled = true,
@@ -15,27 +13,27 @@ export function CdpProvider({
 }) {
   const projectId = process.env.NEXT_PUBLIC_CDP_PROJECT_ID
 
+  // Use our custom ES256-signed JWT endpoint for CDP compatibility
   const getJwt = useCallback(async () => {
     try {
-      const tokenResult = await authClient.token()
-      const jwt = tokenResult.data?.token
-      if (jwt) {
-        console.log('[CDP] Got JWT from authClient.token()')
-        return jwt
+      console.log('[CDP] Fetching ES256 JWT from /api/auth/cdp-token...')
+      const response = await fetch('/api/auth/cdp-token', {
+        credentials: 'include', // Include cookies for session validation
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('[CDP] Token fetch failed:', error)
+        throw new Error(error.error || 'Failed to get CDP token')
       }
 
-      const sessionResult = await authClient.getSession()
-      const sessionToken = sessionResult.data?.session?.token
-      if (sessionToken) {
-        console.log('[CDP] Got JWT from session')
-        return sessionToken
+      const { token } = await response.json()
+      if (!token) {
+        throw new Error('No token returned from CDP token endpoint')
       }
 
-      const tokenErr = tokenResult.error
-      const sessionErr = sessionResult.error
-      const errorMsg = tokenErr?.message ?? sessionErr?.message ?? 'Unable to retrieve Neon Auth token'
-      console.error('[CDP] JWT retrieval failed:', errorMsg)
-      throw new Error(errorMsg)
+      console.log('[CDP] Got ES256 JWT successfully')
+      return token
     } catch (err) {
       console.error('[CDP] getJwt error:', err)
       throw err

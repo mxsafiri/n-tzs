@@ -29,6 +29,7 @@ export function WalletSetupClient() {
   const [email, setEmail] = useState('')
   const [otpCode, setOtpCode] = useState('')
   const [flowId, setFlowId] = useState('')
+  const [walletSaved, setWalletSaved] = useState(false)
 
   const canCreate = isInitialized && !evmAddress
 
@@ -88,13 +89,34 @@ export function WalletSetupClient() {
     }
   }
 
-  // Clear status message after wallet is created
+  // Auto-save wallet to database when created
   useEffect(() => {
-    if (evmAddress && statusMessage === 'Wallet created successfully!') {
+    async function saveWallet() {
+      if (!evmAddress || walletSaved) return
+      
+      try {
+        setStatusMessage('Linking wallet to your account...')
+        const formData = new FormData()
+        formData.set('address', String(evmAddress))
+        await saveEmbeddedWalletAction(formData)
+        setWalletSaved(true)
+        setStatusMessage('Wallet linked to your account!')
+      } catch (err) {
+        console.error('[Wallet] Failed to save wallet:', err)
+        setError('Wallet created but failed to link to account. Please try the save button.')
+      }
+    }
+    
+    saveWallet()
+  }, [evmAddress, walletSaved])
+
+  // Clear status message after wallet is saved
+  useEffect(() => {
+    if (walletSaved && statusMessage === 'Wallet linked to your account!') {
       const timer = setTimeout(() => setStatusMessage(''), 3000)
       return () => clearTimeout(timer)
     }
-  }, [evmAddress, statusMessage])
+  }, [walletSaved, statusMessage])
 
   return (
     <div className="flex flex-col gap-4">
@@ -120,15 +142,24 @@ export function WalletSetupClient() {
           <div className="text-sm font-semibold">Your wallet address</div>
           <div className="mt-2 break-all font-mono text-xs text-white/70">{String(evmAddress)}</div>
 
-          <form action={saveEmbeddedWalletAction} className="mt-4 flex flex-col gap-3">
-            <input type="hidden" name="address" value={addressToSave} />
-            <button
-              type="submit"
-              className="inline-flex h-11 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
-            >
-              Save wallet to account
-            </button>
-          </form>
+          {walletSaved ? (
+            <div className="mt-4 flex items-center gap-2 text-sm text-green-400">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Linked to your nTZS account
+            </div>
+          ) : (
+            <form action={saveEmbeddedWalletAction} className="mt-4 flex flex-col gap-3">
+              <input type="hidden" name="address" value={addressToSave} />
+              <button
+                type="submit"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+              >
+                Save wallet to account
+              </button>
+            </form>
+          )}
         </div>
       ) : (
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">

@@ -1,42 +1,66 @@
-import { SignJWT, exportJWK, generateKeyPair, importPKCS8, importSPKI } from 'jose'
+import { SignJWT, importJWK, type JWK } from 'jose'
 
-// We'll store keys in environment variables
-// In production, you'd want to use a proper key management service
-
-const CDP_JWT_PRIVATE_KEY = process.env.CDP_JWT_PRIVATE_KEY
-const CDP_JWT_PUBLIC_KEY = process.env.CDP_JWT_PUBLIC_KEY
+// Store keys as JWK in environment variables
+// Generate once and store permanently
+const CDP_JWT_PRIVATE_KEY_JWK = process.env.CDP_JWT_PRIVATE_KEY_JWK
+const CDP_JWT_PUBLIC_KEY_JWK = process.env.CDP_JWT_PUBLIC_KEY_JWK
 const CDP_JWT_KID = process.env.CDP_JWT_KID || 'cdp-key-1'
 
-let cachedKeyPair: { privateKey: CryptoKey; publicKey: CryptoKey } | null = null
+// Fallback development keys (generate your own for production!)
+// These are pre-generated ES256 keys for initial setup
+const DEV_PRIVATE_KEY: JWK = {
+  kty: 'EC',
+  crv: 'P-256',
+  x: 'f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU',
+  y: 'x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0',
+  d: 'jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI',
+  alg: 'ES256',
+  use: 'sig',
+}
 
-export async function getKeyPair() {
-  if (cachedKeyPair) return cachedKeyPair
+const DEV_PUBLIC_KEY: JWK = {
+  kty: 'EC',
+  crv: 'P-256',
+  x: 'f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU',
+  y: 'x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0',
+  alg: 'ES256',
+  use: 'sig',
+}
 
-  if (CDP_JWT_PRIVATE_KEY && CDP_JWT_PUBLIC_KEY) {
-    // Import from environment variables
-    const privateKey = await importPKCS8(CDP_JWT_PRIVATE_KEY, 'ES256')
-    const publicKey = await importSPKI(CDP_JWT_PUBLIC_KEY, 'ES256')
-    cachedKeyPair = { privateKey, publicKey }
-    return cachedKeyPair
+let cachedPrivateKey: CryptoKey | null = null
+let cachedPublicJwk: JWK | null = null
+
+export async function getPrivateKey(): Promise<CryptoKey> {
+  if (cachedPrivateKey) return cachedPrivateKey
+
+  let jwk: JWK
+  if (CDP_JWT_PRIVATE_KEY_JWK) {
+    jwk = JSON.parse(CDP_JWT_PRIVATE_KEY_JWK)
+  } else {
+    console.warn('[CDP-JWT] Using development keys. Set CDP_JWT_PRIVATE_KEY_JWK in production!')
+    jwk = DEV_PRIVATE_KEY
   }
 
-  // Generate new key pair (for development - in production use env vars)
-  const keyPair = await generateKeyPair('ES256')
-  cachedKeyPair = keyPair
-  
-  // Log keys for initial setup (remove in production)
-  const privateJwk = await exportJWK(keyPair.privateKey)
-  const publicJwk = await exportJWK(keyPair.publicKey)
-  console.log('[CDP-JWT] Generated new ES256 key pair. Add these to your environment:')
-  console.log('[CDP-JWT] Private JWK:', JSON.stringify(privateJwk))
-  console.log('[CDP-JWT] Public JWK:', JSON.stringify(publicJwk))
-  
-  return cachedKeyPair
+  cachedPrivateKey = await importJWK(jwk, 'ES256') as CryptoKey
+  return cachedPrivateKey
+}
+
+export async function getPublicKeyJwk(): Promise<JWK> {
+  if (cachedPublicJwk) return cachedPublicJwk
+
+  let jwk: JWK
+  if (CDP_JWT_PUBLIC_KEY_JWK) {
+    jwk = JSON.parse(CDP_JWT_PUBLIC_KEY_JWK)
+  } else {
+    jwk = DEV_PUBLIC_KEY
+  }
+
+  cachedPublicJwk = jwk
+  return jwk
 }
 
 export async function getPublicJWKS() {
-  const { publicKey } = await getKeyPair()
-  const jwk = await exportJWK(publicKey)
+  const jwk = await getPublicKeyJwk()
   
   return {
     keys: [
@@ -57,7 +81,7 @@ export interface CDPTokenPayload {
 }
 
 export async function signCDPToken(payload: CDPTokenPayload, issuer: string, audience: string) {
-  const { privateKey } = await getKeyPair()
+  const privateKey = await getPrivateKey()
   
   const jwt = await new SignJWT({
     ...payload,

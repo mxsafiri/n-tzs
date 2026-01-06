@@ -124,6 +124,9 @@ export default async function MintingPage() {
       txHash: mintTransactions.txHash,
       mintStatus: mintTransactions.status,
       mintError: mintTransactions.error,
+      paymentProvider: depositRequests.paymentProvider,
+      pspReference: depositRequests.pspReference,
+      pspChannel: depositRequests.pspChannel,
     })
     .from(depositRequests)
     .innerJoin(users, eq(depositRequests.userId, users.id))
@@ -180,7 +183,7 @@ export default async function MintingPage() {
                 <tr className="text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                   <th className="px-6 py-4">User</th>
                   <th className="px-6 py-4">Amount</th>
-                  <th className="px-6 py-4">Bank</th>
+                  <th className="px-6 py-4">Payment</th>
                   <th className="px-6 py-4">Wallet</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4">Tx Hash</th>
@@ -209,7 +212,27 @@ export default async function MintingPage() {
                         </div>
                         <div className="text-xs text-zinc-500">TZS</div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-zinc-400">{dep.bankName}</td>
+                      <td className="px-6 py-4">
+                        {dep.paymentProvider === 'zenopay' ? (
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-xs font-medium text-violet-400">
+                                ZenoPay
+                              </span>
+                              {dep.pspChannel && (
+                                <span className="text-xs text-zinc-500">{dep.pspChannel}</span>
+                              )}
+                            </div>
+                            {dep.pspReference && (
+                              <code className="mt-1 block rounded bg-zinc-800 px-2 py-1 font-mono text-xs text-emerald-400" title={dep.pspReference}>
+                                {dep.pspReference}
+                              </code>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-zinc-400">{dep.bankName}</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4">
                         <code className="rounded bg-zinc-800 px-2 py-1 font-mono text-xs text-zinc-300 truncate max-w-[120px] block" title={dep.walletAddress}>
                           {dep.walletAddress.slice(0, 8)}...{dep.walletAddress.slice(-6)}

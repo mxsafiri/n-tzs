@@ -16,6 +16,7 @@ import {
   IconWallet,
   IconWithdraw,
 } from '@/app/app/_components/icons'
+import { TokenBalance } from './_components/TokenBalance'
 
 export default async function UserDashboard() {
   await requireRole('end_user')
@@ -56,13 +57,20 @@ export default async function UserDashboard() {
                   </span>
                 </div>
                 
-                <div className="mt-4 flex items-baseline gap-3">
-                  <span className="text-5xl font-bold tracking-tight text-white">0.00</span>
-                  <span className="text-lg text-zinc-500">TZS</span>
-                </div>
-
-                <div className="mt-2 flex items-center gap-2 text-sm">
-                  <span className="text-zinc-500">≈ $0.00 USD</span>
+                <div className="mt-4">
+                  {wallet ? (
+                    <TokenBalance walletAddress={wallet.address} />
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-5xl font-bold tracking-tight text-white">0.00</span>
+                        <span className="text-lg text-zinc-500">TZS</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-sm">
+                        <span className="text-zinc-500">≈ $0.00 USD</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Quick Actions */}

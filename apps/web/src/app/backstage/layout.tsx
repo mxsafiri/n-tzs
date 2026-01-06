@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { requireRole } from '@/lib/auth/rbac'
+import { redirect } from 'next/navigation'
+import { getCurrentDbUser } from '@/lib/auth/rbac'
 
 // Sidebar navigation items
 const navItems = [
@@ -80,7 +81,13 @@ export default async function BackstageLayout({
 }: {
   children: React.ReactNode
 }) {
-  await requireRole('super_admin')
+  const dbUser = await getCurrentDbUser()
+  if (!dbUser) {
+    redirect('/auth/sign-in')
+  }
+  if (dbUser.role === 'end_user') {
+    redirect('/app')
+  }
 
   return (
     <div className="min-h-screen bg-black">

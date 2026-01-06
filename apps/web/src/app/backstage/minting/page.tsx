@@ -1,14 +1,14 @@
 import { desc, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 
-import { requireRole, getCurrentDbUser } from '@/lib/auth/rbac'
+import { requireAnyRole, getCurrentDbUser } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
-import { users, depositRequests, depositApprovals, banks, wallets } from '@ntzs/db'
+import { users, depositRequests, depositApprovals, banks, wallets, mintTransactions } from '@ntzs/db'
 
 async function approveDepositAction(formData: FormData) {
   'use server'
 
-  await requireRole('super_admin')
+  await requireAnyRole(['super_admin', 'bank_admin'])
   const currentUser = await getCurrentDbUser()
   if (!currentUser) throw new Error('User not found')
 
@@ -43,12 +43,41 @@ async function approveDepositAction(formData: FormData) {
   })
 
   // Update deposit status based on decision
-  const newStatus = decision === 'approved' ? 'platform_approved' : 'rejected'
+  // When approved, set to mint_pending so the worker picks it up
+  const newStatus = decision === 'approved' ? 'mint_pending' : 'rejected'
   
   await db
     .update(depositRequests)
     .set({ status: newStatus, updatedAt: new Date() })
     .where(eq(depositRequests.id, depositId))
+
+  revalidatePath('/backstage/minting')
+}
+
+async function retryMintAction(formData: FormData) {
+  'use server'
+
+  await requireAnyRole(['super_admin', 'bank_admin'])
+
+  const depositId = String(formData.get('depositId') ?? '')
+
+  if (!depositId) {
+    throw new Error('Invalid parameters')
+  }
+
+  const { db } = getDb()
+
+  // Reset the deposit to mint_pending so the worker picks it up again
+  await db
+    .update(depositRequests)
+    .set({ status: 'mint_pending', updatedAt: new Date() })
+    .where(eq(depositRequests.id, depositId))
+
+  // Clear the error in mint_transactions
+  await db
+    .update(mintTransactions)
+    .set({ status: 'pending_retry', error: null, updatedAt: new Date() })
+    .where(eq(mintTransactions.depositRequestId, depositId))
 
   revalidatePath('/backstage/minting')
 }
@@ -80,7 +109,7 @@ function StatusBadge({ status }: { status: string }) {
 export default async function MintingPage() {
   const { db } = getDb()
 
-  // Fetch all deposit requests with related data
+  // Fetch all deposit requests with related data including mint transaction info
   const allDeposits = await db
     .select({
       id: depositRequests.id,
@@ -92,11 +121,15 @@ export default async function MintingPage() {
       userId: users.id,
       bankName: banks.name,
       walletAddress: wallets.address,
+      txHash: mintTransactions.txHash,
+      mintStatus: mintTransactions.status,
+      mintError: mintTransactions.error,
     })
     .from(depositRequests)
     .innerJoin(users, eq(depositRequests.userId, users.id))
     .innerJoin(banks, eq(depositRequests.bankId, banks.id))
     .innerJoin(wallets, eq(depositRequests.walletId, wallets.id))
+    .leftJoin(mintTransactions, eq(depositRequests.id, mintTransactions.depositRequestId))
     .orderBy(desc(depositRequests.createdAt))
     .limit(200)
 
@@ -150,7 +183,7 @@ export default async function MintingPage() {
                   <th className="px-6 py-4">Bank</th>
                   <th className="px-6 py-4">Wallet</th>
                   <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Submitted</th>
+                  <th className="px-6 py-4">Tx Hash</th>
                   <th className="px-6 py-4">Actions</th>
                 </tr>
               </thead>
@@ -185,9 +218,28 @@ export default async function MintingPage() {
                       </td>
                       <td className="px-6 py-4">
                         <StatusBadge status={dep.status} />
+                        {dep.mintError && (
+                          <p className="mt-1 text-xs text-rose-400 max-w-[150px] truncate" title={dep.mintError}>
+                            {dep.mintError}
+                          </p>
+                        )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-zinc-400">
-                        {dep.createdAt ? new Date(dep.createdAt).toLocaleDateString() : '—'}
+                      <td className="px-6 py-4">
+                        {dep.txHash ? (
+                          <a
+                            href={`https://sepolia.basescan.org/tx/${dep.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded bg-zinc-800 px-2 py-1 font-mono text-xs text-blue-400 hover:text-blue-300"
+                          >
+                            {dep.txHash.slice(0, 8)}...{dep.txHash.slice(-6)}
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                            </svg>
+                          </a>
+                        ) : (
+                          <span className="text-sm text-zinc-600">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         {dep.status === 'bank_approved' ? (
@@ -213,6 +265,30 @@ export default async function MintingPage() {
                               </button>
                             </form>
                           </div>
+                        ) : dep.status === 'mint_failed' ? (
+                          <form action={retryMintAction}>
+                            <input type="hidden" name="depositId" value={dep.id} />
+                            <button
+                              type="submit"
+                              className="rounded-lg bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
+                            >
+                              Retry Mint
+                            </button>
+                          </form>
+                        ) : dep.status === 'minted' && dep.txHash ? (
+                          <span className="inline-flex items-center gap-1 text-sm text-emerald-400">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Minted
+                          </span>
+                        ) : dep.status === 'mint_pending' || dep.status === 'mint_processing' ? (
+                          <span className="inline-flex items-center gap-1 text-sm text-amber-400">
+                            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                            Processing
+                          </span>
                         ) : (
                           <span className="text-sm text-zinc-600">—</span>
                         )}

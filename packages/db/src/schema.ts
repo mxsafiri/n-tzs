@@ -53,6 +53,8 @@ export const approvalType = pgEnum('approval_type', ['bank', 'platform'])
 
 export const approvalDecision = pgEnum('approval_decision', ['approved', 'rejected'])
 
+export const pspProvider = pgEnum('psp_provider', ['bank_transfer', 'zenopay'])
+
 export const banks = pgTable(
   'banks',
   {
@@ -197,6 +199,12 @@ export const depositRequests = pgTable(
     fiatConfirmedByUserId: uuid('fiat_confirmed_by_user_id').references(() => users.id),
     fiatConfirmedAt: timestamp('fiat_confirmed_at', { withTimezone: true }),
 
+    // PSP integration fields
+    paymentProvider: pspProvider('payment_provider').default('bank_transfer'),
+    pspReference: text('psp_reference'), // ZenoPay transid or bank reference
+    pspChannel: text('psp_channel'), // e.g., 'MPESA-TZ', 'TIGOPESA-TZ'
+    buyerPhone: varchar('buyer_phone', { length: 32 }), // Phone used for M-Pesa payment
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -205,6 +213,7 @@ export const depositRequests = pgTable(
     bankIdx: index('deposit_requests_bank_id_idx').on(t.bankId),
     statusIdx: index('deposit_requests_status_idx').on(t.status),
     idempotencyUq: uniqueIndex('deposit_requests_user_idempotency_uq').on(t.userId, t.idempotencyKey),
+    pspRefIdx: index('deposit_requests_psp_reference_idx').on(t.pspReference),
   })
 )
 

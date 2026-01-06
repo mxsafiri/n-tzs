@@ -27,6 +27,78 @@ function requiredEnv(name: string) {
   return v
 }
 
+function getTodayUTC(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+async function reserveDailyIssuance(
+  sql: ReturnType<typeof createDbClient>['sql'],
+  amountTzs: number
+): Promise<boolean> {
+  const today = getTodayUTC()
+  const defaultCap = Number(process.env.DAILY_ISSUANCE_CAP_TZS ?? '100000000')
+
+  // Ensure today's row exists
+  await sql`
+    insert into daily_issuance (day, cap_tzs, reserved_tzs, issued_tzs, updated_at)
+    values (${today}, ${defaultCap}, 0, 0, now())
+    on conflict (day) do nothing
+  `
+
+  // Atomically reserve if capacity available
+  const result = await sql<{ success: boolean }[]>`
+    update daily_issuance
+    set reserved_tzs = reserved_tzs + ${amountTzs}, updated_at = now()
+    where day = ${today}
+      and (reserved_tzs + ${amountTzs}) <= cap_tzs
+    returning true as success
+  `
+
+  return result.length > 0
+}
+
+async function commitIssuance(
+  sql: ReturnType<typeof createDbClient>['sql'],
+  amountTzs: number
+): Promise<void> {
+  const today = getTodayUTC()
+
+  await sql`
+    update daily_issuance
+    set issued_tzs = issued_tzs + ${amountTzs},
+        reserved_tzs = reserved_tzs - ${amountTzs},
+        updated_at = now()
+    where day = ${today}
+  `
+}
+
+async function releaseReservation(
+  sql: ReturnType<typeof createDbClient>['sql'],
+  amountTzs: number
+): Promise<void> {
+  const today = getTodayUTC()
+
+  await sql`
+    update daily_issuance
+    set reserved_tzs = greatest(0, reserved_tzs - ${amountTzs}),
+        updated_at = now()
+    where day = ${today}
+  `
+}
+
+async function logAudit(
+  sql: ReturnType<typeof createDbClient>['sql'],
+  action: string,
+  entityType: string,
+  entityId: string,
+  metadata: Record<string, unknown>
+): Promise<void> {
+  await sql`
+    insert into audit_logs (action, entity_type, entity_id, metadata, created_at)
+    values (${action}, ${entityType}, ${entityId}, ${JSON.stringify(metadata)}::jsonb, now())
+  `
+}
+
 async function claimNextMintJob(sql: ReturnType<typeof createDbClient>['sql']) {
   const contractAddress =
     process.env.NTZS_CONTRACT_ADDRESS_BASE_SEPOLIA ??
@@ -85,6 +157,26 @@ async function processOne() {
     return false
   }
 
+  // Check daily issuance cap before proceeding
+  const canReserve = await reserveDailyIssuance(sql, job.amount_tzs)
+  if (!canReserve) {
+    // Release the job back to pending - daily cap reached
+    await sql`
+      update deposit_requests
+      set status = 'mint_pending', updated_at = now()
+      where id = ${job.id}
+    `
+    await sql`
+      update mint_transactions
+      set status = 'cap_exceeded', error = 'Daily issuance cap reached', updated_at = now()
+      where deposit_request_id = ${job.id}
+    `
+    // eslint-disable-next-line no-console
+    console.warn('[worker] daily cap reached, deferring', { depositRequestId: job.id, amountTzs: job.amount_tzs })
+    await sql.end({ timeout: 5 })
+    return true
+  }
+
   try {
     const walletRows = await sql<{ address: string }[]>`
       select address from wallets where id = ${job.wallet_id} limit 1
@@ -117,6 +209,9 @@ async function processOne() {
 
     await tx.wait(1)
 
+    // Commit the issuance to daily totals
+    await commitIssuance(sql, job.amount_tzs)
+
     await sql`
       update mint_transactions
       set status = 'minted', updated_at = now()
@@ -128,13 +223,25 @@ async function processOne() {
       where id = ${job.id}
     `
 
+    // Audit log
+    await logAudit(sql, 'mint_completed', 'deposit_request', job.id, {
+      amountTzs: job.amount_tzs,
+      walletAddress,
+      txHash: tx.hash,
+      chain: job.chain,
+      contractAddress: job.contractAddress,
+    })
+
     // eslint-disable-next-line no-console
-    console.log('[worker] minted', { depositRequestId: job.id, txHash: tx.hash })
+    console.log('[worker] minted', { depositRequestId: job.id, txHash: tx.hash, amountTzs: job.amount_tzs })
 
     await sql.end({ timeout: 5 })
     return true
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
+
+    // Release the reservation since mint failed
+    await releaseReservation(sql, job.amount_tzs)
 
     await sql`
       update mint_transactions
@@ -146,6 +253,13 @@ async function processOne() {
       set status = 'mint_failed', updated_at = now()
       where id = ${job.id}
     `
+
+    // Audit log for failure
+    await logAudit(sql, 'mint_failed', 'deposit_request', job.id, {
+      amountTzs: job.amount_tzs,
+      error: errorMessage,
+      chain: job.chain,
+    })
 
     // eslint-disable-next-line no-console
     console.error('[worker] mint_failed', { depositRequestId: job.id, error: errorMessage })

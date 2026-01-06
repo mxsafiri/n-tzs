@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 
 type Action =
@@ -12,29 +12,158 @@ type Action =
   | 'unblacklist'
   | 'wipeBlacklisted'
 
-const actions: { value: Action; label: string; icon: string; description: string; needsAddress: boolean }[] = [
-  { value: 'pause', label: 'Pause Contract', icon: '⏸', description: 'Halt all token transfers', needsAddress: false },
-  { value: 'unpause', label: 'Unpause Contract', icon: '▶️', description: 'Resume token transfers', needsAddress: false },
-  { value: 'freeze', label: 'Freeze Account', icon: '❄️', description: 'Prevent account from sending', needsAddress: true },
-  { value: 'unfreeze', label: 'Unfreeze Account', icon: '🔓', description: 'Allow account to send again', needsAddress: true },
-  { value: 'blacklist', label: 'Blacklist Account', icon: '⛔', description: 'Block all transfers', needsAddress: true },
-  { value: 'unblacklist', label: 'Remove Blacklist', icon: '✅', description: 'Remove from blacklist', needsAddress: true },
-  { value: 'wipeBlacklisted', label: 'Wipe Balance', icon: '🗑️', description: 'Burn blacklisted balance', needsAddress: true },
+type Chain = 'base_sepolia' | 'base' | 'bnb'
+
+const CHAIN_CONFIG: Record<Chain, { label: string; chainId: string; rpcUrl: string; explorer: string }> = {
+  base_sepolia: {
+    label: 'Base Sepolia (Testnet)',
+    chainId: '84532',
+    rpcUrl: 'https://sepolia.base.org',
+    explorer: 'https://sepolia.basescan.org',
+  },
+  base: {
+    label: 'Base Mainnet',
+    chainId: '8453',
+    rpcUrl: 'https://mainnet.base.org',
+    explorer: 'https://basescan.org',
+  },
+  bnb: {
+    label: 'BNB Smart Chain',
+    chainId: '56',
+    rpcUrl: 'https://bsc-dataseed.binance.org',
+    explorer: 'https://bscscan.com',
+  },
+}
+
+function PauseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+    </svg>
+  )
+}
+
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+    </svg>
+  )
+}
+
+function FreezeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+    </svg>
+  )
+}
+
+function UnlockIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+    </svg>
+  )
+}
+
+function BlockIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+    </svg>
+  )
+}
+
+function CheckCircleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+    </svg>
+  )
+}
+
+const actions: { value: Action; label: string; icon: React.ReactNode; description: string; needsAddress: boolean; danger?: boolean }[] = [
+  { value: 'pause', label: 'Pause Contract', icon: <PauseIcon className="h-5 w-5" />, description: 'Halt all token transfers', needsAddress: false, danger: true },
+  { value: 'unpause', label: 'Unpause Contract', icon: <PlayIcon className="h-5 w-5" />, description: 'Resume token transfers', needsAddress: false },
+  { value: 'freeze', label: 'Freeze Account', icon: <FreezeIcon className="h-5 w-5" />, description: 'Prevent account from sending', needsAddress: true },
+  { value: 'unfreeze', label: 'Unfreeze Account', icon: <UnlockIcon className="h-5 w-5" />, description: 'Allow account to send again', needsAddress: true },
+  { value: 'blacklist', label: 'Blacklist Account', icon: <BlockIcon className="h-5 w-5" />, description: 'Block all transfers', needsAddress: true, danger: true },
+  { value: 'unblacklist', label: 'Remove Blacklist', icon: <CheckCircleIcon className="h-5 w-5" />, description: 'Remove from blacklist', needsAddress: true },
+  { value: 'wipeBlacklisted', label: 'Wipe Balance', icon: <TrashIcon className="h-5 w-5" />, description: 'Burn blacklisted balance', needsAddress: true, danger: true },
 ]
 
 export default function TokenAdminPage() {
-  const contractAddress = process.env.NEXT_PUBLIC_NTZS_CONTRACT_ADDRESS || ''
   const safeAdmin = process.env.NEXT_PUBLIC_NTZS_SAFE_ADMIN || ''
-  const chainLabel = '84532'
 
+  const [selectedChain, setSelectedChain] = useState<Chain>('base_sepolia')
   const [selectedAction, setSelectedAction] = useState<Action>('pause')
   const [account, setAccount] = useState('')
   const [copied, setCopied] = useState(false)
+  const [contractState, setContractState] = useState<{
+    paused: boolean | null
+    totalSupply: string | null
+    loading: boolean
+  }>({ paused: null, totalSupply: null, loading: false })
 
-  const basescanContractUrl = useMemo(() => {
+  const chainConfig = CHAIN_CONFIG[selectedChain]
+
+  const contractAddress = useMemo(() => {
+    if (selectedChain === 'base_sepolia') return process.env.NEXT_PUBLIC_NTZS_CONTRACT_ADDRESS_BASE_SEPOLIA || ''
+    if (selectedChain === 'base') return process.env.NEXT_PUBLIC_NTZS_CONTRACT_ADDRESS_BASE || ''
+    if (selectedChain === 'bnb') return process.env.NEXT_PUBLIC_NTZS_CONTRACT_ADDRESS_BNB || ''
+    return ''
+  }, [selectedChain])
+
+  const explorerUrl = useMemo(() => {
     if (!contractAddress || !ethers.isAddress(contractAddress)) return ''
-    return `https://sepolia.basescan.org/address/${contractAddress}`
-  }, [contractAddress])
+    return `${chainConfig.explorer}/address/${contractAddress}`
+  }, [contractAddress, chainConfig.explorer])
+
+  // Fetch contract state (paused, total supply)
+  useEffect(() => {
+    if (!contractAddress || !ethers.isAddress(contractAddress)) return
+
+    const fetchState = async () => {
+      setContractState(prev => ({ ...prev, loading: true }))
+      try {
+        const provider = new ethers.JsonRpcProvider(chainConfig.rpcUrl)
+        const token = new ethers.Contract(
+          contractAddress,
+          [
+            'function paused() view returns (bool)',
+            'function totalSupply() view returns (uint256)',
+            'function decimals() view returns (uint8)',
+          ],
+          provider
+        )
+
+        const [paused, totalSupply, decimals] = await Promise.all([
+          token.paused().catch(() => null),
+          token.totalSupply().catch(() => null),
+          token.decimals().catch(() => 18),
+        ])
+
+        const formattedSupply = totalSupply !== null
+          ? ethers.formatUnits(totalSupply, decimals)
+          : null
+
+        setContractState({ paused, totalSupply: formattedSupply, loading: false })
+      } catch {
+        setContractState({ paused: null, totalSupply: null, loading: false })
+      }
+    }
+
+    fetchState()
+  }, [contractAddress, chainConfig.rpcUrl])
 
   const iface = useMemo(() => {
     return new ethers.Interface([
@@ -95,7 +224,7 @@ export default function TokenAdminPage() {
     return JSON.stringify(
       {
         version: '1.0',
-        chainId: chainLabel,
+        chainId: chainConfig.chainId,
         createdAt: new Date().toISOString(),
         meta: {
           name: 'nTZS Admin Action',
@@ -112,7 +241,7 @@ export default function TokenAdminPage() {
       null,
       2
     )
-  }, [selectedAction, chainLabel, data, to])
+  }, [selectedAction, chainConfig.chainId, data, to])
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(safeTxJson)
@@ -133,8 +262,28 @@ export default function TokenAdminPage() {
       </div>
 
       <div className="p-8">
+        {/* Chain Selector */}
+        <div className="mb-6">
+          <label className="text-sm font-medium text-zinc-400">Select Chain</label>
+          <div className="mt-2 flex gap-2">
+            {(Object.keys(CHAIN_CONFIG) as Chain[]).map((chain) => (
+              <button
+                key={chain}
+                onClick={() => setSelectedChain(chain)}
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
+                  selectedChain === chain
+                    ? 'border-violet-500/50 bg-violet-500/10 text-white'
+                    : 'border-white/10 bg-white/5 text-zinc-400 hover:border-white/20 hover:text-white'
+                }`}
+              >
+                {CHAIN_CONFIG[chain].label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Contract Info Bar */}
-        <div className="mb-8 grid gap-4 sm:grid-cols-3">
+        <div className="mb-8 grid gap-4 sm:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-zinc-900/50 p-5">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-blue-500/10 p-2.5">
@@ -147,9 +296,9 @@ export default function TokenAdminPage() {
                 <p className="truncate font-mono text-sm text-white" title={contractAddress}>
                   {contractAddress || 'Not configured'}
                 </p>
-                {basescanContractUrl && (
-                  <a href={basescanContractUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:text-blue-300">
-                    View on BaseScan →
+                {explorerUrl && (
+                  <a href={explorerUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:text-blue-300">
+                    View on Explorer →
                   </a>
                 )}
               </div>
@@ -181,7 +330,39 @@ export default function TokenAdminPage() {
               </div>
               <div>
                 <p className="text-xs font-medium text-zinc-500">Chain</p>
-                <p className="font-mono text-sm text-white">Base Sepolia ({chainLabel})</p>
+                <p className="font-mono text-sm text-white">{chainConfig.label}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Contract State */}
+          <div className="rounded-2xl border border-white/10 bg-zinc-900/50 p-5">
+            <div className="flex items-center gap-3">
+              <div className={`rounded-lg p-2.5 ${contractState.paused ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`}>
+                {contractState.paused ? (
+                  <PauseIcon className="h-5 w-5 text-rose-400" />
+                ) : (
+                  <PlayIcon className="h-5 w-5 text-emerald-400" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-zinc-500">Contract State</p>
+                {contractState.loading ? (
+                  <p className="text-sm text-zinc-400">Loading...</p>
+                ) : contractState.paused === null ? (
+                  <p className="text-sm text-zinc-500">Unable to fetch</p>
+                ) : (
+                  <>
+                    <p className={`text-sm font-medium ${contractState.paused ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      {contractState.paused ? 'PAUSED' : 'ACTIVE'}
+                    </p>
+                    {contractState.totalSupply && (
+                      <p className="text-xs text-zinc-500">
+                        Supply: {Number(contractState.totalSupply).toLocaleString()} nTZS
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -206,7 +387,9 @@ export default function TokenAdminPage() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">{action.icon}</span>
+                      <div className={`${action.danger ? 'text-rose-400' : selectedAction === action.value ? 'text-violet-400' : 'text-zinc-400'}`}>
+                        {action.icon}
+                      </div>
                       <div>
                         <p className={`font-medium ${selectedAction === action.value ? 'text-white' : 'text-zinc-300'}`}>
                           {action.label}

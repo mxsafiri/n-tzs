@@ -1,14 +1,14 @@
 import { desc, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 
-import { requireRole, getCurrentDbUser } from '@/lib/auth/rbac'
+import { requireAnyRole, getCurrentDbUser } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
 import { users, kycCases } from '@ntzs/db'
 
 async function updateKycStatusAction(formData: FormData) {
   'use server'
 
-  await requireRole('super_admin')
+  await requireAnyRole(['super_admin', 'platform_compliance'])
   const currentUser = await getCurrentDbUser()
   if (!currentUser) throw new Error('User not found')
 

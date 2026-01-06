@@ -2,7 +2,7 @@ import { desc, eq, count } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 
-import { UserRole, requireRole, getCurrentDbUser } from '@/lib/auth/rbac'
+import { UserRole, requireAnyRole, requireRole, getCurrentDbUser } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
 import { users, kycCases, depositRequests, depositApprovals, banks, wallets } from '@ntzs/db'
 
@@ -83,7 +83,7 @@ async function updateUserRoleAction(formData: FormData) {
 async function updateKycStatusAction(formData: FormData) {
   'use server'
 
-  await requireRole('super_admin')
+  await requireAnyRole(['super_admin', 'platform_compliance'])
   const currentUser = await getCurrentDbUser()
   if (!currentUser) throw new Error('User not found')
 
@@ -114,7 +114,7 @@ async function updateKycStatusAction(formData: FormData) {
 async function approveDepositAction(formData: FormData) {
   'use server'
 
-  await requireRole('super_admin')
+  await requireAnyRole(['super_admin', 'bank_admin'])
   const currentUser = await getCurrentDbUser()
   if (!currentUser) throw new Error('User not found')
 
@@ -149,7 +149,8 @@ async function approveDepositAction(formData: FormData) {
   })
 
   // Update deposit status based on decision
-  const newStatus = decision === 'approved' ? 'platform_approved' : 'rejected'
+  // When approved, set to mint_pending so the worker picks it up
+  const newStatus = decision === 'approved' ? 'mint_pending' : 'rejected'
   
   await db
     .update(depositRequests)

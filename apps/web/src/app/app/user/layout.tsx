@@ -87,11 +87,11 @@ export default async function UserLayout({ children }: { children: ReactNode }) 
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 w-64 border-r border-white/10 bg-black/60 backdrop-blur-xl">
+      <aside className="fixed inset-y-0 left-0 z-40 w-64 border-r border-white/10 bg-black/70 backdrop-blur-xl">
         {/* Logo */}
         <div className="flex h-16 items-center gap-3 border-b border-white/10 px-6">
           <Link href="/app/user" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 to-purple-600">
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
               <img src="/ntzs-logo.png" alt="nTZS" className="h-6 w-6 object-contain" />
             </div>
             <div>
@@ -101,15 +101,30 @@ export default async function UserLayout({ children }: { children: ReactNode }) 
           </Link>
         </div>
 
+        {/* Sidebar meta */}
+        <div className="border-b border-white/10 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
+              {dbUser.role.replace('_', ' ')}
+            </span>
+            <Link
+              href="/account/settings"
+              className="text-xs font-medium text-zinc-300 hover:text-white"
+            >
+              Account
+            </Link>
+          </div>
+        </div>
+
         {/* Navigation */}
-        <nav className="p-4">
+        <nav className="p-4 pb-28">
           <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-600">Menu</p>
           <div className="space-y-1">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
               >
                 <item.icon className="h-5 w-5" />
                 {item.label}
@@ -123,12 +138,12 @@ export default async function UserLayout({ children }: { children: ReactNode }) 
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
               >
                 <item.icon className="h-5 w-5" />
                 {item.label}
                 {item.badge && (
-                  <span className="ml-auto rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                  <span className="ml-auto rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300 ring-1 ring-emerald-500/20">
                     {item.badge}
                   </span>
                 )}
@@ -139,9 +154,9 @@ export default async function UserLayout({ children }: { children: ReactNode }) 
 
         {/* Wallet Status */}
         <div className="absolute bottom-0 left-0 right-0 border-t border-white/10 p-4">
-          <div className="rounded-xl bg-white/5 p-4">
+          <div className="rounded-xl bg-white/5 p-4 ring-1 ring-white/10">
             <div className="flex items-center gap-3">
-              <div className={`h-3 w-3 rounded-full ${wallet ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
+              <div className={`h-2.5 w-2.5 rounded-full ${wallet ? 'bg-emerald-400' : 'bg-amber-400'}`} />
               <div>
                 <p className="text-sm font-medium text-white">{wallet ? 'Wallet Active' : 'Setup Required'}</p>
                 <p className="text-xs text-zinc-500">

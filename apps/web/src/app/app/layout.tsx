@@ -21,11 +21,22 @@ export default async function AppLayout({
 
   const role = dbUser.role as UserRole
 
-  const navItems: { href: string; label: string }[] = (() => {
-    if (role === 'end_user') {
-      return [{ href: '/app/user', label: 'Dashboard' }]
-    }
+  if (role === 'end_user') {
+    return (
+      <CdpProvider>
+        <div className="min-h-screen bg-black text-white">
+          <div className="pointer-events-none fixed inset-0 opacity-70">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(121,40,202,0.22),transparent_40%),radial-gradient(circle_at_80%_30%,rgba(0,112,243,0.22),transparent_45%),radial-gradient(circle_at_45%_90%,rgba(16,185,129,0.14),transparent_45%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:56px_56px]" />
+          </div>
 
+          <div className="relative z-10">{children}</div>
+        </div>
+      </CdpProvider>
+    )
+  }
+
+  const navItems: { href: string; label: string }[] = (() => {
     if (role === 'bank_admin') {
       return [{ href: '/app/bank', label: 'Bank' }]
     }

@@ -24,24 +24,18 @@ export default async function UserDashboard() {
   const pendingCount = recentDeposits.filter(d => !['minted', 'rejected', 'cancelled'].includes(d.status)).length
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <div className="border-b border-white/10 bg-black/40 backdrop-blur-xl">
-        <div className="px-8 py-6">
-          <p className="text-sm text-zinc-400">Welcome back</p>
-          <h1 className="mt-1 text-2xl font-bold text-white">{dbUser.email}</h1>
-        </div>
+    <div className="p-8">
+      <div className="mb-6">
+        <p className="text-sm text-zinc-400">Welcome back</p>
+        <h1 className="mt-1 text-xl font-semibold text-white">{dbUser.email}</h1>
       </div>
 
-      <div className="p-8">
-        <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3">
           {/* Main Balance Card */}
           <div className="lg:col-span-2">
-            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-950/50 via-black to-purple-950/30 p-8">
-              {/* Decorative elements */}
-              <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
-              <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl" />
-              
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-8 backdrop-blur-xl">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(121,40,202,0.18),transparent_45%),radial-gradient(circle_at_80%_100%,rgba(0,112,243,0.12),transparent_45%)]" />
+
               <div className="relative">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-zinc-400">Total Balance</span>
@@ -93,11 +87,17 @@ export default async function UserDashboard() {
             </div>
 
             {/* Recent Transactions */}
-            <div className="mt-6 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl">
+            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl">
               <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
                 <h2 className="font-semibold text-white">Recent Transactions</h2>
-                <Link href="/app/user/activity" className="text-sm text-violet-400 hover:text-violet-300">
-                  View all →
+                <Link
+                  href="/app/user/activity"
+                  className="inline-flex items-center gap-1.5 text-sm text-violet-400 hover:text-violet-300"
+                >
+                  View all
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
                 </Link>
               </div>
               <div className="p-4">
@@ -149,7 +149,7 @@ export default async function UserDashboard() {
           {/* Right Sidebar */}
           <div className="space-y-6">
             {/* Wallet Card */}
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-xl">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
               <div className="flex items-center gap-3">
                 <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${wallet ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}>
                   <svg className={`h-6 w-6 ${wallet ? 'text-emerald-400' : 'text-amber-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -179,7 +179,7 @@ export default async function UserDashboard() {
             </div>
 
             {/* Rewards Card */}
-            <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-violet-950/50 to-purple-950/30 p-6">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
               <h3 className="font-semibold text-white">Rewards</h3>
               <p className="mt-1 text-xs text-zinc-500">Earn more with nTZS</p>
 
@@ -217,7 +217,7 @@ export default async function UserDashboard() {
             </div>
 
             {/* Status Card */}
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-xl">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
               <h3 className="font-semibold text-white">Account Status</h3>
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -243,7 +243,6 @@ export default async function UserDashboard() {
             </div>
           </div>
         </div>
-      </div>
     </div>
   )
 }

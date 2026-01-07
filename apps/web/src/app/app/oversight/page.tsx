@@ -18,6 +18,7 @@ import {
   IconClock,
   IconUsers,
 } from '@/app/app/_components/icons'
+import { ExportReportButton } from './_components/ExportReportButton'
 
 const CONTRACT_ADDRESS = process.env.NTZS_CONTRACT_ADDRESS_BASE_SEPOLIA || ''
 const RPC_URL = 'https://sepolia.base.org'
@@ -152,9 +153,12 @@ export default async function OversightDashboard() {
             Real-time transparency into nTZS issuance, reserves, and compliance
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-2 ring-1 ring-emerald-500/20">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-          <span className="text-sm font-medium text-emerald-300">Live Data</span>
+        <div className="flex items-center gap-3">
+          <ExportReportButton />
+          <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-2 ring-1 ring-emerald-500/20">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+            <span className="text-sm font-medium text-emerald-300">Live Data</span>
+          </div>
         </div>
       </div>
 

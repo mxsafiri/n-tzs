@@ -1,5 +1,4 @@
-import { desc, eq, sql, and, gte } from 'drizzle-orm'
-import Link from 'next/link'
+import { desc, eq, sql } from 'drizzle-orm'
 import { ethers } from 'ethers'
 
 import { requireAnyRole } from '@/lib/auth/rbac'
@@ -13,6 +12,12 @@ import {
   auditLogs,
   wallets,
 } from '@ntzs/db'
+import {
+  IconChain,
+  IconCoins,
+  IconClock,
+  IconUsers,
+} from '@/app/app/_components/icons'
 
 const CONTRACT_ADDRESS = process.env.NTZS_CONTRACT_ADDRESS_BASE_SEPOLIA || ''
 const RPC_URL = 'https://sepolia.base.org'
@@ -158,28 +163,28 @@ export default async function OversightDashboard() {
           title="Total Supply (On-Chain)"
           value={`${formatNumber(parseFloat(onChainSupply))} nTZS`}
           subtitle="Verified on Base Sepolia"
-          icon="🔗"
+          icon={<IconChain className="h-5 w-5" />}
           color="emerald"
         />
         <MetricCard
           title="Total Minted (DB)"
           value={`${formatNumber(stats?.totalMinted || 0)} TZS`}
           subtitle={`${stats?.totalDeposits || 0} deposits processed`}
-          icon="💰"
+          icon={<IconCoins className="h-5 w-5" />}
           color="violet"
         />
         <MetricCard
           title="Pending Issuance"
           value={`${formatNumber(stats?.totalPending || 0)} TZS`}
           subtitle="Awaiting confirmation"
-          icon="⏳"
+          icon={<IconClock className="h-5 w-5" />}
           color="amber"
         />
         <MetricCard
           title="Registered Users"
           value={formatNumber(userCount?.count || 0)}
           subtitle={`${walletCount?.count || 0} wallets linked`}
-          icon="👥"
+          icon={<IconUsers className="h-5 w-5" />}
           color="blue"
         />
       </div>
@@ -469,21 +474,23 @@ function MetricCard({
   title: string
   value: string
   subtitle: string
-  icon: string
+  icon: React.ReactNode
   color: 'emerald' | 'violet' | 'amber' | 'blue'
 }) {
   const colorClasses = {
-    emerald: 'from-emerald-500/20 to-emerald-500/5 ring-emerald-500/20',
-    violet: 'from-violet-500/20 to-violet-500/5 ring-violet-500/20',
-    amber: 'from-amber-500/20 to-amber-500/5 ring-amber-500/20',
-    blue: 'from-blue-500/20 to-blue-500/5 ring-blue-500/20',
+    emerald: 'from-emerald-500/20 to-emerald-500/5 ring-emerald-500/20 text-emerald-400',
+    violet: 'from-violet-500/20 to-violet-500/5 ring-violet-500/20 text-violet-400',
+    amber: 'from-amber-500/20 to-amber-500/5 ring-amber-500/20 text-amber-400',
+    blue: 'from-blue-500/20 to-blue-500/5 ring-blue-500/20 text-blue-400',
   }
 
   return (
     <div className={`rounded-2xl bg-gradient-to-br ${colorClasses[color]} p-5 ring-1`}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">{title}</span>
-        <span className="text-xl">{icon}</span>
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+          {icon}
+        </div>
       </div>
       <p className="mt-3 text-2xl font-bold text-white">{value}</p>
       <p className="mt-1 text-xs text-zinc-500">{subtitle}</p>

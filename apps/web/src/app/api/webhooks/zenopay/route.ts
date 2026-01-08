@@ -5,6 +5,8 @@ import { getDb } from '@/lib/db'
 import { verifyZenoPayWebhook, type ZenoPayWebhookPayload } from '@/lib/psp/zenopay'
 import { depositRequests } from '@ntzs/db'
 
+const SAFE_MINT_THRESHOLD_TZS = 9000
+
 export async function POST(request: NextRequest) {
   const apiKey = request.headers.get('x-api-key')
 
@@ -45,10 +47,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'ignored', reason: 'not_found_or_processed' })
   }
 
+  // Route to Safe approval if amount >= threshold
+  const newStatus = deposit.amountTzs >= SAFE_MINT_THRESHOLD_TZS ? 'mint_requires_safe' : 'mint_pending'
+
   await db
     .update(depositRequests)
     .set({
-      status: 'mint_pending',
+      status: newStatus,
       pspReference: transid || reference,
       pspChannel: channel,
       fiatConfirmedAt: new Date(),
@@ -56,7 +61,7 @@ export async function POST(request: NextRequest) {
     })
     .where(eq(depositRequests.id, order_id))
 
-  console.log(`[ZenoPay Webhook] Deposit ${order_id} updated to mint_pending`)
+  console.log(`[ZenoPay Webhook] Deposit ${order_id} updated to ${newStatus}`)
 
   return NextResponse.json({ status: 'success', order_id })
 }

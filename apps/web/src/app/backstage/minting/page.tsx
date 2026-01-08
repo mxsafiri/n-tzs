@@ -1,9 +1,25 @@
-import { desc, eq } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
+import { ethers } from 'ethers'
 import { revalidatePath } from 'next/cache'
 
 import { requireAnyRole, getCurrentDbUser } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
-import { users, depositRequests, depositApprovals, banks, wallets, mintTransactions } from '@ntzs/db'
+import {
+  users,
+  depositRequests,
+  depositApprovals,
+  banks,
+  wallets,
+  mintTransactions,
+  dailyIssuance,
+} from '@ntzs/db'
+import { SafeMintActions } from './_components/SafeMintActions'
+
+const SAFE_MINT_THRESHOLD_TZS = 9000
+
+function getTodayUTC(): string {
+  return new Date().toISOString().slice(0, 10)
+}
 
 async function approveDepositAction(formData: FormData) {
   'use server'
@@ -44,12 +60,145 @@ async function approveDepositAction(formData: FormData) {
 
   // Update deposit status based on decision
   // When approved, set to mint_pending so the worker picks it up
-  const newStatus = decision === 'approved' ? 'mint_pending' : 'rejected'
+  const newStatus =
+    decision === 'approved'
+      ? deposit.paymentProvider === 'zenopay' && deposit.amountTzs > SAFE_MINT_THRESHOLD_TZS
+        ? 'mint_requires_safe'
+        : 'mint_pending'
+      : 'rejected'
   
   await db
     .update(depositRequests)
     .set({ status: newStatus, updatedAt: new Date() })
     .where(eq(depositRequests.id, depositId))
+
+  revalidatePath('/backstage/minting')
+}
+
+async function confirmSafeMintAction(formData: FormData) {
+  'use server'
+
+  await requireAnyRole(['super_admin', 'bank_admin'])
+
+  const depositId = String(formData.get('depositId') ?? '')
+  const txHash = String(formData.get('txHash') ?? '')
+
+  if (!depositId) {
+    throw new Error('Invalid parameters')
+  }
+
+  if (!txHash || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+    throw new Error('Invalid transaction hash')
+  }
+
+  const { db } = getDb()
+
+  const [dep] = await db
+    .select({
+      id: depositRequests.id,
+      amountTzs: depositRequests.amountTzs,
+      status: depositRequests.status,
+      chain: depositRequests.chain,
+      walletAddress: wallets.address,
+    })
+    .from(depositRequests)
+    .innerJoin(wallets, eq(depositRequests.walletId, wallets.id))
+    .where(eq(depositRequests.id, depositId))
+    .limit(1)
+
+  if (!dep) {
+    throw new Error('Deposit not found')
+  }
+
+  if (dep.status !== 'mint_requires_safe') {
+    throw new Error('Deposit is not awaiting Safe mint')
+  }
+
+  const contractAddress = process.env.NTZS_CONTRACT_ADDRESS_BASE_SEPOLIA || ''
+  if (!contractAddress || !ethers.isAddress(contractAddress)) {
+    throw new Error('Contract address not configured')
+  }
+
+  const rpcUrl = process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org'
+  const provider = new ethers.JsonRpcProvider(rpcUrl)
+  const receipt = await provider.getTransactionReceipt(txHash)
+
+  if (!receipt) {
+    throw new Error('Transaction not found on chain')
+  }
+
+  if (receipt.status !== 1) {
+    throw new Error('Transaction failed')
+  }
+
+  if (!receipt.to || receipt.to.toLowerCase() !== contractAddress.toLowerCase()) {
+    throw new Error('Transaction is not for the nTZS contract')
+  }
+
+  const decimals = BigInt(18)
+  const base = BigInt(10)
+  const expectedAmountWei = BigInt(String(dep.amountTzs)) * base ** decimals
+  const transferIface = new ethers.Interface([
+    'event Transfer(address indexed from, address indexed to, uint256 value)',
+  ])
+
+  const zeroAddress = '0x0000000000000000000000000000000000000000'
+  const targetWallet = dep.walletAddress.toLowerCase()
+  const sawExpectedMint = receipt.logs.some((log) => {
+    if (!log.address || log.address.toLowerCase() !== contractAddress.toLowerCase()) return false
+    try {
+      const parsed = transferIface.parseLog({
+        topics: log.topics as string[],
+        data: log.data,
+      })
+      if (!parsed || parsed.name !== 'Transfer') return false
+      const from = String(parsed.args.from).toLowerCase()
+      const to = String(parsed.args.to).toLowerCase()
+      const value = BigInt(parsed.args.value.toString())
+      return from === zeroAddress && to === targetWallet && value === expectedAmountWei
+    } catch {
+      return false
+    }
+  })
+
+  if (!sawExpectedMint) {
+    throw new Error('Transaction does not match expected mint transfer')
+  }
+
+  await db
+    .update(depositRequests)
+    .set({ status: 'minted', updatedAt: new Date() })
+    .where(eq(depositRequests.id, depositId))
+
+  await db
+    .insert(mintTransactions)
+    .values({
+      depositRequestId: depositId,
+      chain: dep.chain,
+      contractAddress,
+      txHash,
+      status: 'minted',
+      error: null,
+    })
+    .onConflictDoUpdate({
+      target: mintTransactions.depositRequestId,
+      set: { txHash, status: 'minted', error: null, updatedAt: new Date() },
+    })
+
+  const today = getTodayUTC()
+
+  await db
+    .insert(dailyIssuance)
+    .values({ day: today, capTzs: Number(process.env.DAILY_ISSUANCE_CAP_TZS ?? '100000000'), reservedTzs: 0, issuedTzs: 0 })
+    .onConflictDoNothing()
+
+  await db
+    .update(dailyIssuance)
+    .set({
+      issuedTzs: sql`${dailyIssuance.issuedTzs} + ${dep.amountTzs}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(dailyIssuance.day, today))
 
   revalidatePath('/backstage/minting')
 }
@@ -93,6 +242,7 @@ function StatusBadge({ status }: { status: string }) {
     bank_approved: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
     platform_approved: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     mint_pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    mint_requires_safe: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
     mint_processing: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     minted: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     mint_failed: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
@@ -312,6 +462,15 @@ export default async function MintingPage() {
                             </svg>
                             Processing
                           </span>
+                        ) : dep.status === 'mint_requires_safe' ? (
+                          <SafeMintActions
+                            depositId={dep.id}
+                            amountTzs={dep.amountTzs}
+                            walletAddress={dep.walletAddress}
+                            contractAddress={process.env.NTZS_CONTRACT_ADDRESS_BASE_SEPOLIA || ''}
+                            chainId="84532"
+                            onConfirm={confirmSafeMintAction}
+                          />
                         ) : (
                           <span className="text-sm text-zinc-600">—</span>
                         )}

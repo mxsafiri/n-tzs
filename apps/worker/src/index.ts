@@ -17,6 +17,8 @@ dotenv.config({ path: path.join(repoRoot, '.env.local'), override: true })
 const ZENOPAY_API_URL = process.env.ZENOPAY_API_URL || 'https://zenoapi.com/api'
 const ZENOPAY_API_KEY = process.env.ZENOPAY_API_KEY || ''
 
+const SAFE_MINT_THRESHOLD_TZS = 9000
+
 const NTZS_ABI = [
   'function mint(address to, uint256 amount)',
   'function MINTER_ROLE() view returns (bytes32)',
@@ -145,7 +147,7 @@ async function pollZenoPayForCompletedPayments(sql: ReturnType<typeof createDbCl
         
         await sql`
           update deposit_requests
-          set status = 'mint_pending',
+          set status = case when amount_tzs > ${SAFE_MINT_THRESHOLD_TZS} then 'mint_requires_safe' else 'mint_pending' end,
               psp_reference = ${payment.transid},
               psp_channel = ${payment.channel},
               fiat_confirmed_at = now(),

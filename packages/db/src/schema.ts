@@ -42,6 +42,7 @@ export const depositStatus = pgEnum('deposit_status', [
   'bank_approved',
   'platform_approved',
   'mint_pending',
+  'mint_requires_safe',
   'mint_processing',
   'minted',
   'mint_failed',

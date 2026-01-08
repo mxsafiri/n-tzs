@@ -1,0 +1,1 @@
+ALTER TYPE "public"."deposit_status" ADD VALUE 'mint_requires_safe' BEFORE 'mint_processing';

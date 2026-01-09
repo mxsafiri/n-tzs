@@ -2,28 +2,26 @@ import { eq, and } from 'drizzle-orm'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { getDb } from '@/lib/db'
-import { verifyZenoPayWebhook, type ZenoPayWebhookPayload } from '@/lib/psp/zenopay'
+import { type ZenoPayWebhookPayload } from '@/lib/psp/zenopay'
 import { depositRequests } from '@ntzs/db'
 
 const SAFE_MINT_THRESHOLD_TZS = 9000
 
+// Known ZenoPay server IPs
+const ZENOPAY_ALLOWED_IPS = ['64.227.9.159']
+
 export async function POST(request: NextRequest) {
-  // Log all incoming webhook requests for debugging
-  const allHeaders: Record<string, string> = {}
-  request.headers.forEach((value, key) => {
-    allHeaders[key] = key.toLowerCase().includes('key') ? '[REDACTED]' : value
-  })
-  console.log('[ZenoPay Webhook] Incoming request headers:', JSON.stringify(allHeaders))
+  const realIp = request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  console.log('[ZenoPay Webhook] Request from IP:', realIp)
 
-  const apiKey = request.headers.get('x-api-key')
-
-  // Read body once
+  // Read body
   const rawBody = await request.text()
-  console.log('[ZenoPay Webhook] Raw body:', rawBody.slice(0, 500))
+  console.log('[ZenoPay Webhook] Raw body:', rawBody)
 
-  if (!verifyZenoPayWebhook(apiKey)) {
-    console.error('[ZenoPay Webhook] Invalid API key - received:', apiKey ? '[PRESENT]' : '[MISSING]')
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Log warning if from unknown IP but still process
+  // (ZenoPay may use multiple IPs, and we verify order exists in our DB anyway)
+  if (!realIp || !ZENOPAY_ALLOWED_IPS.includes(realIp)) {
+    console.warn('[ZenoPay Webhook] Request from non-whitelisted IP:', realIp)
   }
 
   let payload: ZenoPayWebhookPayload

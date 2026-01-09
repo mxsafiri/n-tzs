@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import { requireRole, requireDbUser } from '@/lib/auth/rbac'
+import { requireAnyRole, requireDbUser } from '@/lib/auth/rbac'
 
 import { IconCopy, IconGift, IconLink } from '@/app/app/_components/icons'
 
 export default async function InvitePage() {
-  await requireRole('end_user')
+  await requireAnyRole(['end_user', 'super_admin'])
   const dbUser = await requireDbUser()
 
   // Generate a simple referral code based on user ID

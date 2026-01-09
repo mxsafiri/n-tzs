@@ -59,17 +59,34 @@ export async function GET(request: NextRequest) {
       )
 
       if (!response.ok) {
+        console.error(`[cron/poll-zenopay] API error for ${deposit.id}: ${response.status}`)
         results.push({ depositId: deposit.id, status: 'api_error' })
         continue
       }
 
-      const data = await response.json() as {
+      // Handle empty or invalid JSON responses gracefully
+      const text = await response.text()
+      if (!text || text.trim() === '') {
+        console.error(`[cron/poll-zenopay] Empty response for ${deposit.id}`)
+        results.push({ depositId: deposit.id, status: 'empty_response' })
+        continue
+      }
+
+      let data: {
         result: string
         data?: Array<{
           payment_status: string
           transid: string
           channel: string
         }>
+      }
+      
+      try {
+        data = JSON.parse(text)
+      } catch {
+        console.error(`[cron/poll-zenopay] Invalid JSON for ${deposit.id}:`, text.slice(0, 100))
+        results.push({ depositId: deposit.id, status: 'invalid_json' })
+        continue
       }
 
       if (data.result === 'SUCCESS' && data.data?.[0]?.payment_status === 'COMPLETED') {

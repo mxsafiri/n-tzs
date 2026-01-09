@@ -1,7 +1,7 @@
 import { desc, eq } from 'drizzle-orm'
 import Link from 'next/link'
 
-import { requireDbUser, requireRole } from '@/lib/auth/rbac'
+import { requireDbUser, requireAnyRole } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
 import { kycCases } from '@ntzs/db'
 
@@ -9,7 +9,7 @@ import { GlassPanel } from '../../_components/GlassPanel'
 import { submitKycCaseAction } from './actions'
 
 export default async function KycPage() {
-  await requireRole('end_user')
+  await requireAnyRole(['end_user', 'super_admin'])
   const dbUser = await requireDbUser()
 
   const { db } = getDb()

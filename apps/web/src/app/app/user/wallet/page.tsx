@@ -1,10 +1,10 @@
-import { requireRole } from '@/lib/auth/rbac'
+import { requireAnyRole } from '@/lib/auth/rbac'
 
 import { GlassPanel } from '../../_components/GlassPanel'
 import { WalletSetupClient } from '@/app/app/user/wallet/WalletSetupClient'
 
 export default async function WalletPage() {
-  await requireRole('end_user')
+  await requireAnyRole(['end_user', 'super_admin'])
 
   const hasCdpProjectId = Boolean(process.env.NEXT_PUBLIC_CDP_PROJECT_ID)
 

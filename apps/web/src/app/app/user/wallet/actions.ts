@@ -3,12 +3,12 @@
 import { eq, and } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 
-import { requireDbUser, requireRole } from '@/lib/auth/rbac'
+import { requireDbUser, requireAnyRole } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
 import { wallets } from '@ntzs/db'
 
 export async function saveEmbeddedWalletAction(formData: FormData) {
-  await requireRole('end_user')
+  await requireAnyRole(['end_user', 'super_admin'])
   const dbUser = await requireDbUser()
 
   const address = String(formData.get('address') ?? '').trim()

@@ -1,14 +1,14 @@
 import { desc, eq } from 'drizzle-orm'
 import Link from 'next/link'
 
-import { requireDbUser, requireRole } from '@/lib/auth/rbac'
+import { requireDbUser, requireAnyRole } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
 import { depositRequests, kycCases, wallets } from '@ntzs/db'
 
 import { GlassPanel } from '../../_components/GlassPanel'
 
 export default async function ActivityPage() {
-  await requireRole('end_user')
+  await requireAnyRole(['end_user', 'super_admin'])
   const dbUser = await requireDbUser()
 
   const { db } = getDb()

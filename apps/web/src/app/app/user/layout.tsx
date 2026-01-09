@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { eq } from 'drizzle-orm'
 
-import { requireDbUser, requireRole } from '@/lib/auth/rbac'
+import { requireDbUser, requireAnyRole } from '@/lib/auth/rbac'
 import { UserTopBar } from '@/app/app/_components/UserTopBar'
 import { getDb } from '@/lib/db'
 import { wallets } from '@ntzs/db'
@@ -9,7 +9,7 @@ import { wallets } from '@ntzs/db'
 import { MobileSidebar } from './_components/MobileSidebar'
 
 export default async function UserLayout({ children }: { children: ReactNode }) {
-  await requireRole('end_user')
+  await requireAnyRole(['end_user', 'super_admin'])
   const dbUser = await requireDbUser()
   const { db } = getDb()
 

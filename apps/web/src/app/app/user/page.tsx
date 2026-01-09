@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { eq, desc } from 'drizzle-orm'
 
-import { requireRole, requireDbUser } from '@/lib/auth/rbac'
+import { requireAnyRole, requireDbUser } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
 import { wallets, depositRequests } from '@ntzs/db'
 
@@ -19,7 +19,7 @@ import {
 import { TokenBalance } from './_components/TokenBalance'
 
 export default async function UserDashboard() {
-  await requireRole('end_user')
+  await requireAnyRole(['end_user', 'super_admin'])
   const dbUser = await requireDbUser()
   const { db } = getDb()
 

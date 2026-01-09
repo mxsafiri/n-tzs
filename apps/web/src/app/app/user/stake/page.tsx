@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import { requireRole } from '@/lib/auth/rbac'
+import { requireAnyRole } from '@/lib/auth/rbac'
 
 import { IconSparkles } from '@/app/app/_components/icons'
 
 export default async function StakePage() {
-  await requireRole('end_user')
+  await requireAnyRole(['end_user', 'super_admin'])
 
   return (
     <div className="min-h-screen">

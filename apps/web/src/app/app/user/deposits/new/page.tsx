@@ -1,14 +1,14 @@
 import { and, eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 
-import { requireDbUser, requireRole } from '@/lib/auth/rbac'
+import { requireDbUser, requireAnyRole } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
 import { banks, kycCases, wallets } from '@ntzs/db'
 
 import { DepositForm } from './DepositForm'
 
 export default async function NewDepositPage() {
-  await requireRole('end_user')
+  await requireAnyRole(['end_user', 'super_admin'])
   const dbUser = await requireDbUser()
 
   const { db } = getDb()

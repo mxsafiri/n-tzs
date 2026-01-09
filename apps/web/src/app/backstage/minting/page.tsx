@@ -138,13 +138,12 @@ async function processPendingMintsAction() {
   revalidatePath('/backstage/minting')
 }
 
-async function forceAdvanceSubmittedAction(formData: FormData) {
+async function verifyAndAdvanceSubmittedAction(formData: FormData) {
   'use server'
 
   await requireAnyRole(['super_admin'])
 
   const depositId = String(formData.get('depositId') ?? '')
-  const pspReference = String(formData.get('pspReference') ?? '').trim()
 
   if (!depositId) {
     throw new Error('Invalid deposit ID')
@@ -162,6 +161,40 @@ async function forceAdvanceSubmittedAction(formData: FormData) {
     throw new Error('Deposit not found or not in submitted status')
   }
 
+  // Verify with ZenoPay API that payment is actually completed
+  const ZENOPAY_API_KEY = process.env.ZENOPAY_API_KEY
+  if (!ZENOPAY_API_KEY) {
+    throw new Error('ZenoPay API key not configured')
+  }
+
+  const response = await fetch(
+    `https://api.zeno.africa/order-status?order_id=${encodeURIComponent(depositId)}`,
+    { headers: { 'x-api-key': ZENOPAY_API_KEY } }
+  )
+
+  if (!response.ok) {
+    throw new Error(`ZenoPay API error: ${response.status}`)
+  }
+
+  const text = await response.text()
+  if (!text || text.trim() === '') {
+    throw new Error('ZenoPay returned empty response - cannot verify payment')
+  }
+
+  let data: { result: string; data?: Array<{ payment_status: string; transid: string; channel: string }> }
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error('ZenoPay returned invalid JSON - cannot verify payment')
+  }
+
+  // Only advance if ZenoPay confirms payment is COMPLETED
+  if (data.result !== 'SUCCESS' || data.data?.[0]?.payment_status !== 'COMPLETED') {
+    throw new Error(`Payment not confirmed by ZenoPay. Status: ${data.data?.[0]?.payment_status || 'unknown'}`)
+  }
+
+  const payment = data.data[0]
+
   // Route to Safe approval if amount >= threshold
   const newStatus = deposit.amountTzs >= SAFE_MINT_THRESHOLD_TZS 
     ? 'mint_requires_safe' 
@@ -171,13 +204,14 @@ async function forceAdvanceSubmittedAction(formData: FormData) {
     .update(depositRequests)
     .set({
       status: newStatus,
-      pspReference: pspReference || deposit.pspReference,
+      pspReference: payment.transid,
+      pspChannel: payment.channel,
       fiatConfirmedAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(depositRequests.id, depositId))
 
-  console.log(`[Admin] Force advanced deposit ${depositId} from submitted to ${newStatus}`)
+  console.log(`[Admin] Verified and advanced deposit ${depositId} to ${newStatus}`, { transid: payment.transid })
   revalidatePath('/backstage/minting')
 }
 
@@ -654,19 +688,13 @@ export default async function MintingPage() {
                             onConfirm={confirmSafeMintAction}
                           />
                         ) : dep.status === 'submitted' ? (
-                          <form action={forceAdvanceSubmittedAction} className="flex flex-col gap-2">
+                          <form action={verifyAndAdvanceSubmittedAction}>
                             <input type="hidden" name="depositId" value={dep.id} />
-                            <input
-                              type="text"
-                              name="pspReference"
-                              placeholder="PSP Ref (optional)"
-                              className="rounded bg-zinc-800 px-2 py-1 text-xs text-white placeholder:text-zinc-600 border border-zinc-700 focus:border-amber-500/50 outline-none"
-                            />
                             <button
                               type="submit"
-                              className="rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
+                              className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                             >
-                              Force Advance →
+                              Verify & Advance
                             </button>
                           </form>
                         ) : (

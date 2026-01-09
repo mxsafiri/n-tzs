@@ -1,6 +1,7 @@
-import { desc, eq, sql } from 'drizzle-orm'
+import { desc, eq, sql, and } from 'drizzle-orm'
 import { ethers } from 'ethers'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 
 import { requireAnyRole, getCurrentDbUser } from '@/lib/auth/rbac'
 import { getDb } from '@/lib/db'
@@ -12,13 +13,129 @@ import {
   wallets,
   mintTransactions,
   dailyIssuance,
+  auditLogs,
 } from '@ntzs/db'
 import { SafeMintActions } from './_components/SafeMintActions'
 
 const SAFE_MINT_THRESHOLD_TZS = 9000
+const BASE_SEPOLIA_RPC_URL = process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org'
+const MINTER_PRIVATE_KEY = process.env.MINTER_PRIVATE_KEY || ''
+const NTZS_CONTRACT_ADDRESS = process.env.NTZS_CONTRACT_ADDRESS_BASE_SEPOLIA || ''
+const DAILY_ISSUANCE_CAP_TZS = Number(process.env.DAILY_ISSUANCE_CAP_TZS ?? '100000000')
+
+const NTZS_ABI = [
+  'function mint(address to, uint256 amount)',
+] as const
 
 function getTodayUTC(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+async function processPendingMintsAction() {
+  'use server'
+  
+  await requireAnyRole(['super_admin'])
+  
+  if (!MINTER_PRIVATE_KEY || !NTZS_CONTRACT_ADDRESS) {
+    console.error('[Manual Mint] Minting not configured')
+    revalidatePath('/backstage/minting')
+    return
+  }
+  
+  const { db } = getDb()
+  const today = getTodayUTC()
+  
+  // Get pending mints
+  const pendingDeposits = await db
+    .select({
+      id: depositRequests.id,
+      amountTzs: depositRequests.amountTzs,
+      chain: depositRequests.chain,
+      walletAddress: wallets.address,
+    })
+    .from(depositRequests)
+    .innerJoin(wallets, eq(depositRequests.walletId, wallets.id))
+    .where(eq(depositRequests.status, 'mint_pending'))
+    .limit(5)
+  
+  if (pendingDeposits.length === 0) {
+    revalidatePath('/backstage/minting')
+    return
+  }
+  
+  const provider = new ethers.JsonRpcProvider(BASE_SEPOLIA_RPC_URL)
+  const signer = new ethers.Wallet(MINTER_PRIVATE_KEY, provider)
+  const contract = new ethers.Contract(NTZS_CONTRACT_ADDRESS, NTZS_ABI, signer)
+  
+  for (const deposit of pendingDeposits) {
+    try {
+      // Mark as processing
+      await db
+        .update(depositRequests)
+        .set({ status: 'mint_processing', updatedAt: new Date() })
+        .where(and(eq(depositRequests.id, deposit.id), eq(depositRequests.status, 'mint_pending')))
+      
+      // Create mint transaction record
+      await db
+        .insert(mintTransactions)
+        .values({
+          depositRequestId: deposit.id,
+          chain: deposit.chain,
+          contractAddress: NTZS_CONTRACT_ADDRESS,
+          status: 'pending',
+        })
+        .onConflictDoUpdate({
+          target: mintTransactions.depositRequestId,
+          set: { status: 'pending', error: null, updatedAt: new Date() },
+        })
+      
+      // Calculate amount in wei (18 decimals)
+      const amountWei = BigInt(deposit.amountTzs) * BigInt(10 ** 18)
+      
+      // Execute mint
+      const tx = await contract.mint(deposit.walletAddress, amountWei)
+      const receipt = await tx.wait()
+      
+      if (receipt && receipt.status === 1) {
+        // Success
+        await db
+          .update(depositRequests)
+          .set({ status: 'minted', updatedAt: new Date() })
+          .where(eq(depositRequests.id, deposit.id))
+        
+        await db
+          .update(mintTransactions)
+          .set({ txHash: receipt.hash, status: 'minted', updatedAt: new Date() })
+          .where(eq(mintTransactions.depositRequestId, deposit.id))
+        
+        // Update daily issuance
+        await db
+          .insert(dailyIssuance)
+          .values({ day: today, capTzs: DAILY_ISSUANCE_CAP_TZS, reservedTzs: 0, issuedTzs: deposit.amountTzs })
+          .onConflictDoUpdate({
+            target: dailyIssuance.day,
+            set: { issuedTzs: sql`${dailyIssuance.issuedTzs} + ${deposit.amountTzs}`, updatedAt: new Date() },
+          })
+        
+        console.log(`[Manual Mint] Minted ${deposit.amountTzs} TZS to ${deposit.walletAddress}, tx: ${receipt.hash}`)
+      } else {
+        throw new Error('Transaction failed')
+      }
+    } catch (err) {
+      console.error(`[Manual Mint] Error minting deposit ${deposit.id}:`, err)
+      await db
+        .update(depositRequests)
+        .set({ status: 'mint_failed', updatedAt: new Date() })
+        .where(eq(depositRequests.id, deposit.id))
+      
+      await db
+        .update(mintTransactions)
+        .set({ status: 'failed', error: err instanceof Error ? err.message : 'Unknown error', updatedAt: new Date() })
+        .where(eq(mintTransactions.depositRequestId, deposit.id))
+    }
+  }
+  
+  revalidatePath('/backstage/minting')
 }
 
 async function approveDepositAction(formData: FormData) {
@@ -293,6 +410,7 @@ export default async function MintingPage() {
     .limit(200)
 
   const pendingApproval = allDeposits.filter(d => d.status === 'bank_approved').length
+  const pendingMints = allDeposits.filter(d => d.status === 'mint_pending').length
   const totalMinted = allDeposits.filter(d => d.status === 'minted').length
   const totalVolume = allDeposits
     .filter(d => d.status === 'minted')
@@ -302,11 +420,26 @@ export default async function MintingPage() {
     <div className="min-h-screen">
       {/* Page Header */}
       <div className="border-b border-white/10 bg-zinc-950/50">
-        <div className="px-8 py-6">
-          <h1 className="text-2xl font-bold text-white">Minting Queue</h1>
-          <p className="mt-1 text-sm text-zinc-400">
-            Approve deposit requests and manage nTZS minting
-          </p>
+        <div className="px-8 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Minting Queue</h1>
+            <p className="mt-1 text-sm text-zinc-400">
+              Approve deposit requests and manage nTZS minting
+            </p>
+          </div>
+          {pendingMints > 0 && (
+            <form action={processPendingMintsAction}>
+              <button
+                type="submit"
+                className="rounded-lg bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/30 transition-colors flex items-center gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Process {pendingMints} Pending Mint{pendingMints !== 1 ? 's' : ''}
+              </button>
+            </form>
+          )}
         </div>
       </div>
 

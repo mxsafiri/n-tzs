@@ -8,27 +8,40 @@ import { depositRequests } from '@ntzs/db'
 const SAFE_MINT_THRESHOLD_TZS = 9000
 
 export async function POST(request: NextRequest) {
+  // Log all incoming webhook requests for debugging
+  const allHeaders: Record<string, string> = {}
+  request.headers.forEach((value, key) => {
+    allHeaders[key] = key.toLowerCase().includes('key') ? '[REDACTED]' : value
+  })
+  console.log('[ZenoPay Webhook] Incoming request headers:', JSON.stringify(allHeaders))
+
   const apiKey = request.headers.get('x-api-key')
 
+  // Read body once
+  const rawBody = await request.text()
+  console.log('[ZenoPay Webhook] Raw body:', rawBody.slice(0, 500))
+
   if (!verifyZenoPayWebhook(apiKey)) {
-    console.error('[ZenoPay Webhook] Invalid API key')
+    console.error('[ZenoPay Webhook] Invalid API key - received:', apiKey ? '[PRESENT]' : '[MISSING]')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   let payload: ZenoPayWebhookPayload
   try {
-    payload = await request.json()
+    payload = JSON.parse(rawBody)
   } catch {
+    console.error('[ZenoPay Webhook] Invalid JSON')
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
   const { order_id, payment_status, reference, transid, channel } = payload
 
   if (!order_id || !payment_status) {
+    console.error('[ZenoPay Webhook] Missing required fields:', { order_id, payment_status })
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  console.log(`[ZenoPay Webhook] order_id=${order_id} status=${payment_status}`)
+  console.log(`[ZenoPay Webhook] Processing: order_id=${order_id} status=${payment_status} transid=${transid}`)
 
   if (payment_status !== 'COMPLETED') {
     return NextResponse.json({ status: 'acknowledged', payment_status })

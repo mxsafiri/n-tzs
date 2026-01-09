@@ -4,6 +4,7 @@ import { depositRequests } from '@ntzs/db'
 import { eq, and, lt, sql } from 'drizzle-orm'
 
 const ZENOPAY_API_URL = process.env.ZENOPAY_API_URL || 'https://api.zeno.africa'
+const ZENOPAY_ORDER_STATUS_URL = 'https://api.zeno.africa'
 const ZENOPAY_API_KEY = process.env.ZENOPAY_API_KEY || ''
 const CRON_SECRET = process.env.CRON_SECRET || ''
 const SAFE_MINT_THRESHOLD_TZS = 9000
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
   for (const deposit of pendingDeposits) {
     try {
       const response = await fetch(
-        `${ZENOPAY_API_URL}/order-status?order_id=${encodeURIComponent(deposit.id)}`,
+        `${ZENOPAY_ORDER_STATUS_URL}/order-status?order_id=${encodeURIComponent(deposit.id)}`,
         { headers: { 'x-api-key': ZENOPAY_API_KEY } }
       )
 

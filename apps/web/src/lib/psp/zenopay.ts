@@ -3,7 +3,7 @@
  * Mobile Money Tanzania integration for nTZS deposits
  */
 
-const ZENOPAY_API_URL = process.env.ZENOPAY_API_URL || 'https://zenoapi.com/api'
+const ZENOPAY_API_URL = process.env.ZENOPAY_API_URL || 'https://api.zeno.africa'
 const ZENOPAY_API_KEY = process.env.ZENOPAY_API_KEY || ''
 
 export interface ZenoPayPaymentRequest {
@@ -87,7 +87,7 @@ export async function getZenoPayOrderStatus(
   }
 
   const response = await fetch(
-    `${ZENOPAY_API_URL}/payments/order-status?order_id=${encodeURIComponent(orderId)}`,
+    `https://api.zeno.africa/order-status?order_id=${encodeURIComponent(orderId)}`,
     {
       method: 'GET',
       headers: {

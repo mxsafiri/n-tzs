@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import Link from 'next/link'
 
-import { IconArrowDown, IconBank, IconCard, IconInfo, IconPhone } from '@/app/app/_components/icons'
+import { IconBank, IconCard, IconInfo, IconPhone } from '@/app/app/_components/icons'
 
 import { createDepositRequestAction } from './actions'
 
@@ -146,28 +146,6 @@ export function DepositForm({ defaultBankId, userPhone }: DepositFormProps) {
                 <span className="text-sm font-semibold">T</span>
               </div>
               <span className="text-sm font-semibold text-white">TZS</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
-            <IconArrowDown className="h-5 w-5 text-zinc-300" />
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Receive</span>
-            <span className="text-xs text-emerald-300">1:1</span>
-          </div>
-          <div className="mt-3 flex items-end justify-between gap-4">
-            <div className="w-full text-3xl font-semibold tracking-tight text-zinc-500">≈ same amount</div>
-            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
-              <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
-                <img src="/ntzs-logo.png" alt="nTZS" className="h-4 w-4" />
-              </div>
-              <span className="text-sm font-semibold text-white">nTZS</span>
             </div>
           </div>
         </div>

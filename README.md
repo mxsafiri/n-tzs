@@ -1,97 +1,187 @@
 # nTZS
 
-nTZS is an ERC-20 stablecoin-style token issued against approved fiat deposits. This repository contains:
+nTZS is an ERC-20 stablecoin-style token issued against approved fiat deposits, built for Tanzania's mobile money ecosystem.
 
-- `apps/web`: Next.js web app (includes `/backstage` super-admin portal)
-- `apps/worker`: background worker that mints nTZS on-chain for approved deposits
-- `packages/contracts`: Hardhat workspace for the nTZS ERC-20 contract
-- `packages/db`: Drizzle schema + DB client
+## 🌟 Overview
 
-## Networks
+- **ERC-20 token** on Base Sepolia (testnet) - migrating to Base mainnet
+- **Fiat-backed**: 1 nTZS = 1 TZS (Tanzanian Shilling)
+- **Mobile money integration**: M-Pesa, Tigo Pesa, Airtel Money, Halotel
+- **Compliance features**: KYC verification, transaction monitoring
+- **Open source**: Seeking contributors and auditors
 
-- Base Sepolia (chainId: `84532`)
+## 🏗️ Architecture
 
-## Deployed contracts
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   User App      │    │   Backstage     │    │   ZenoPay API   │
+│   (Next.js)     │    │   (Admin Panel) │    │   (Mobile Money)│
+└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
+          │                      │                      │
+          ▼                      ▼                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Database (Neon)                        │
+│  - Users, KYC, Deposits, Wallets, Mint Transactions        │
+└─────────────────────────────────────────────────────────────┘
+          │                      │
+          ▼                      ▼
+┌─────────────────┐    ┌─────────────────┐
+│   Cron Jobs     │    │   Mint Worker   │
+│   - Poll PSP    │    │   - Mint nTZS   │
+│   - Process     │    │   - Update DB   │
+└─────────────────┘    └─────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Base Blockchain (nTZS Contract)               │
+│  - ERC-20 with pause, freeze, blacklist, wipe features     │
+└─────────────────────────────────────────────────────────────┘
+```
 
-- nTZS (Base Sepolia): `0x6A9525A5C82F92E10741Fcdcb16DbE9111630077`
-- Safe admin (Base Sepolia): `0x943Ec4ECA8195F54Fb5369B168534F9462Ce4faa`
+## 📁 Repository Structure
 
-## Quick start
+- `apps/web`: Next.js web app (user portal + `/backstage` super-admin)
+- `apps/worker`: Background worker for automated minting
+- `packages/contracts`: Hardhat workspace for nTZS ERC-20 contract
+- `packages/db`: Drizzle schema + database client
 
-1. Install dependencies
+## 🌐 Networks & Deployments
 
+### Testnet (Current)
+- **Base Sepolia** (chainId: `84532`)
+- nTZS Contract: `0x6A9525A5C82F92E10741Fcdcb16DbE9111630077`
+- Safe Admin: `0x943Ec4ECA8195F54Fb5369B168534F9462Ce4faa`
+
+### Mainnet (Planned)
+- **Base** (chainId: `8453`)
+- Coming soon after audit and testing
+
+## 🚀 Quick Start
+
+1. **Clone & Install**
 ```bash
+git clone https://github.com/mxsafiri/n-tzs.git
+cd n-tzs
 npm install
 ```
 
-2. Configure env
-
-Create `.env.local` (never commit secrets). Required variables:
-
-- `DATABASE_URL`
-- `BASE_SEPOLIA_RPC_URL`
-- `NTZS_CONTRACT_ADDRESS_BASE_SEPOLIA`
-- `NTZS_SAFE_ADMIN`
-- `MINTER_PRIVATE_KEY`
-
-Optional:
-
-- `WORKER_POLL_MS` (default: 5000)
-
-3. Run the web app
-
+2. **Environment Setup**
 ```bash
-npm run dev:web
+cp .env.example .env.local
+# Edit .env.local with your keys (never commit)
 ```
 
-4. Run the worker
+Required variables:
+```env
+DATABASE_URL=postgresql://...
+BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
+NTZS_CONTRACT_ADDRESS_BASE_SEPOLIA=0x6A9525A5C82F92E10741Fcdcb16DbE9111630077
+NTZS_SAFE_ADMIN=0x943Ec4ECA8195F54Fb5369B168534F9462Ce4faa
+MINTER_PRIVATE_KEY=0x...
+ZENOPAY_API_KEY=...
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
+3. **Run Development**
 ```bash
+# Web app (includes user portal + admin)
+npm run dev:web
+
+# Mint worker (in separate terminal)
 npm run dev:worker
 ```
 
-## Mint worker behavior
+4. **Access Applications**
+- User Portal: `http://localhost:3000/app`
+- Admin Portal: `http://localhost:3000/backstage`
 
-The worker continuously:
+## 💰 Deposit & Mint Flow
 
-- Polls for `deposit_requests` with `status = mint_pending` and `chain = base`
-- Claims the next request using row locking, sets it to `mint_processing`
-- Submits an on-chain mint transaction
-- Writes/updates `mint_transactions` (`tx_hash`, status, error)
-- Marks the deposit request `minted` (or `mint_failed` on error)
+1. **User submits deposit** with amount + phone number
+2. **ZenoPay processes** mobile money payment (M-Pesa, etc.)
+3. **Webhook confirms** payment → status: `mint_pending`
+4. **Worker mints** nTZS to user's wallet
+5. **Status updated** to `minted` ✅
 
-## Backstage admin portal
+## 🔧 Key Features
 
-Open:
+### Token Contract
+- **ERC-20 standard** with EIP-2612 (permit)
+- **Pausable**: Emergency pause all transfers
+- **Freeze**: Freeze individual accounts (can receive, can't send)
+- **Blacklist**: Block transfers to/from addresses
+- **Wipe**: Burn blacklisted balances
+- **Role-based**: MINTER, PAUSER, FREEZER, ADMIN roles
 
-- `http://localhost:3000/backstage`
+### Web Application
+- **KYC verification** with document upload
+- **Multi-wallet support** (Base, with more chains planned)
+- **Real-time balance** updates from blockchain
+- **Transaction history** and activity tracking
+- **Responsive design** for mobile-first Tanzania market
 
-The Backstage portal:
+### Admin Portal
+- **User management** and role assignment
+- **Deposit approval** workflow
+- **Mint queue** monitoring
+- **Safe integration** for large transactions (≥9,000 TZS)
+- **Audit logging** for compliance
 
-- Is gated to `super_admin`
-- Lets you manage user roles
-- Includes an nTZS admin panel that generates Safe-compatible transaction payloads for:
-  - pause / unpause
-  - freeze / unfreeze
-  - blacklist / unblacklist
-  - wipeBlacklisted
+## 🤝 Contributing
 
-## Token metadata assets
+We welcome contributions! Areas where we need help:
 
-The web app hosts a simple token list and logo:
+### 🔍 Smart Contract Audit
+- Security review of nTZS contract
+- Gas optimization suggestions
+- Compliance with ERC-20 standards
 
-- Token list: `/tokenlist.json`
-- Logo: `/ntzs-logo.png`
+### 🛠️ Development
+- **Frontend**: React/Next.js improvements
+- **Smart Contracts**: Additional features, testing
+- **Backend**: API optimizations, error handling
+- **DevOps**: Monitoring, CI/CD improvements
 
-These are intended for hosting on a public domain and then using the public URLs when submitting token metadata to explorers.
+### 📋 Specific Areas
+1. **Multi-chain support** (Ethereum, Polygon, etc.)
+2. **Advanced KYC** with biometric verification
+3. **DeFi integrations** (DEXes, lending protocols)
+4. **Mobile app** (React Native/Flutter)
+5. **Compliance tools** (AML screening, reporting)
 
-## Contracts
+### 🚀 Getting Started Contributing
 
-The nTZS contract includes:
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes with tests
+4. Submit a Pull Request with description
 
-- Pausable
-- Role-based mint/burn
-- Freeze and blacklist controls
-- Wipe (burn) for blacklisted balances
+**Please include:**
+- Clear description of changes
+- Tests for new functionality
+- Security considerations for contract changes
 
-Development scripts live in `packages/contracts`.
+## 🔒 Security
+
+- **All contracts** will be professionally audited before mainnet
+- **Bug bounty** program planned post-launch
+- **Multi-sig controls** for critical operations
+- **Regular security** updates and patches
+
+## 📞 Contact
+
+- **GitHub Issues**: For bugs and feature requests
+- **Discord**: [Coming soon]
+- **Twitter**: [@nTZS_token](https://twitter.com/nTZS_token)
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+**⚠️ Important**: This is testnet software. Do not use with real funds until mainnet audit is complete.
+
+---
+
+*Building the future of digital currency in Tanzania* 🇹🇿

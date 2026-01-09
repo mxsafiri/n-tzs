@@ -25,8 +25,11 @@ function getTodayUTC(): string {
 export async function GET(request: NextRequest) {
   try {
     // Verify cron secret
+    // Vercel cron jobs are authenticated via the cron config, not headers
     const authHeader = request.headers.get('authorization')
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+    const isVercelCron = request.headers.get('x-vercel-cron') === '1'
+    
+    if (CRON_SECRET && !isVercelCron && authHeader !== `Bearer ${CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

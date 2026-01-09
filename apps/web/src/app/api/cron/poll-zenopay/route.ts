@@ -14,8 +14,12 @@ export const maxDuration = 60
 export async function GET(request: NextRequest) {
   try {
     // Verify cron secret to prevent unauthorized access
+    // Vercel cron jobs are authenticated via the cron config, not headers
+    // Only enforce secret if explicitly set AND request is not from Vercel cron
     const authHeader = request.headers.get('authorization')
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+    const isVercelCron = request.headers.get('x-vercel-cron') === '1'
+    
+    if (CRON_SECRET && !isVercelCron && authHeader !== `Bearer ${CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

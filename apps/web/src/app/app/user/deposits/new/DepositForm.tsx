@@ -15,7 +15,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-violet-500/25 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed hover:shadow-violet-500/40"
+      className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-75 active:scale-[0.97] active:shadow-violet-500/15 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 hover:shadow-violet-500/40"
     >
       {pending ? (
         <span className="flex items-center justify-center gap-2">
@@ -79,7 +79,7 @@ export function DepositForm({ defaultBankId, userPhone }: DepositFormProps) {
           <div className="mt-8 flex flex-col gap-3">
             <Link
               href="/app/user"
-              className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-violet-500/25 transition-all hover:shadow-violet-500/40"
+              className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-4 text-center text-base font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-75 active:scale-[0.98] hover:shadow-violet-500/40"
             >
               Go to Dashboard
             </Link>
@@ -88,7 +88,7 @@ export function DepositForm({ defaultBankId, userPhone }: DepositFormProps) {
                 setSubmitted(false)
                 setSubmittedAmount('')
               }}
-              className="w-full rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-base font-medium text-white transition-colors hover:bg-white/10"
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-base font-medium text-white transition-all duration-75 active:scale-[0.98] active:bg-white/[0.08] hover:bg-white/10"
             >
               Make Another Deposit
             </button>

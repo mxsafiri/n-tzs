@@ -77,7 +77,7 @@ export default async function UserDashboard() {
                 <div className="mt-8 flex flex-wrap gap-3">
                   <Link
                     href="/app/user/deposits/new"
-                    className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition-all hover:bg-white/90 hover:scale-105"
+                    className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition-transform duration-75 hover:bg-white/90 active:scale-95 active:bg-white/80"
                   >
                     <IconPlus className="h-4 w-4" />
                     Deposit
@@ -177,7 +177,7 @@ export default async function UserDashboard() {
               ) : (
                 <Link
                   href="/app/user/wallet"
-                  className="mt-4 block w-full rounded-xl bg-violet-500 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-violet-600"
+                  className="mt-4 block w-full rounded-xl bg-violet-500 py-3 text-center text-sm font-semibold text-white transition-transform duration-75 hover:bg-violet-600 active:scale-[0.98]"
                 >
                   Create Wallet
                 </Link>
@@ -190,7 +190,7 @@ export default async function UserDashboard() {
               <p className="mt-1 text-xs text-zinc-500">Earn more with nTZS</p>
 
               <div className="mt-4 space-y-3">
-                <Link href="/app/user/invite" className="flex items-center gap-3 rounded-xl bg-white/5 p-3 transition-colors hover:bg-white/10">
+                <Link href="/app/user/invite" className="flex items-center gap-3 rounded-xl bg-white/5 p-3 transition-all duration-75 hover:bg-white/10 active:scale-[0.98] active:bg-white/[0.07]">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
                     <IconUsers className="h-4 w-4 text-emerald-400" />
                   </div>
@@ -201,7 +201,7 @@ export default async function UserDashboard() {
                   <IconChevronRight className="h-4 w-4 text-zinc-600" />
                 </Link>
 
-                <Link href="/app/user/stake" className="flex items-center gap-3 rounded-xl bg-white/5 p-3 transition-colors hover:bg-white/10">
+                <Link href="/app/user/stake" className="flex items-center gap-3 rounded-xl bg-white/5 p-3 transition-all duration-75 hover:bg-white/10 active:scale-[0.98] active:bg-white/[0.07]">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/20">
                     <IconSparkles className="h-4 w-4 text-violet-400" />
                   </div>

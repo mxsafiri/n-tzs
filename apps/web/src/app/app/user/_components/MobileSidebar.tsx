@@ -59,7 +59,7 @@ export function MobileSidebar({ wallet }: MobileSidebarProps) {
       {/* Mobile Menu Button - Only visible on mobile */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 backdrop-blur-xl lg:hidden"
+        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 backdrop-blur-xl transition-transform duration-75 active:scale-90 lg:hidden"
         aria-label="Open menu"
       >
         <MenuIcon className="h-5 w-5 text-white" />
@@ -110,10 +110,10 @@ export function MobileSidebar({ wallet }: MobileSidebarProps) {
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-75 active:scale-[0.98] ${
                   isActive(item.href)
                     ? 'bg-white/10 text-white'
-                    : 'text-zinc-300 hover:bg-white/[0.06] hover:text-white'
+                    : 'text-zinc-300 hover:bg-white/[0.06] hover:text-white active:bg-white/[0.08]'
                 }`}
               >
                 <item.icon className="h-5 w-5" />
@@ -129,10 +129,10 @@ export function MobileSidebar({ wallet }: MobileSidebarProps) {
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-75 active:scale-[0.98] ${
                   isActive(item.href)
                     ? 'bg-white/10 text-white'
-                    : 'text-zinc-300 hover:bg-white/[0.06] hover:text-white'
+                    : 'text-zinc-300 hover:bg-white/[0.06] hover:text-white active:bg-white/[0.08]'
                 }`}
               >
                 <item.icon className="h-5 w-5" />

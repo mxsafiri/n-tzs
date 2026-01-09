@@ -60,6 +60,27 @@ body {
   font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* Remove 300ms tap delay on mobile for all interactive elements */
+button, a, [role="button"], input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* Instant press feedback for buttons */
+.btn-press {
+  transition: transform 50ms ease, opacity 50ms ease, box-shadow 150ms ease;
+  will-change: transform;
+}
+
+.btn-press:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* Link press feedback */
+a:active {
+  opacity: 0.8;
+}
+
 .ntzs-float-3d {
   animation: ntzs-float 6s ease-in-out infinite;
 }
